@@ -844,10 +844,15 @@ const DB = (function(){
       var localTs=await idbGet('state_ts')||'';
       if(!localTs||cloudTs>localTs){
         var cloudData=rows[0].data;
-        // Réinjecter les docs locaux dans les salariés du cloud
+        // Réinjecter les docs locaux (non stockés en cloud)
         cloudData.salaries=_mergeDocs(cloudData.salaries, _state.salaries);
-        // Garder le journal local (non stocké cloud)
         cloudData.journal=_state.journal||[];
+        // Préserver le modèle de contrat local s'il est plus récent
+        var localTpl=(_state.templates||[]).find(function(t){return t.id==='main'||t.cle==='main';});
+        var cloudTpl=((cloudData.templates)||[]).find(function(t){return t.id==='main'||t.cle==='main';});
+        if(localTpl&&localTpl.valeur&&(!cloudTpl||!cloudTpl.valeur||(localTpl.updated_at||(localTs||''))>=(cloudTpl.updated_at||''))){
+          cloudData.templates=_state.templates;
+        }
         _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},cloudData);
         _initCounters();
         await idbSet('state',_state);
@@ -1103,10 +1108,15 @@ const DB = (function(){
       var localTs=await idbGet('state_ts')||'';
       if(!localTs||cloudTs>localTs){
         var cloudData=rows[0].data;
-        // Réinjecter les docs locaux dans les salariés du cloud
+        // Réinjecter les docs locaux (non stockés en cloud)
         cloudData.salaries=_mergeDocs(cloudData.salaries, _state.salaries);
-        // Garder le journal local (non stocké cloud)
         cloudData.journal=_state.journal||[];
+        // Préserver le modèle de contrat local s'il est plus récent
+        var localTpl=(_state.templates||[]).find(function(t){return t.id==='main'||t.cle==='main';});
+        var cloudTpl=((cloudData.templates)||[]).find(function(t){return t.id==='main'||t.cle==='main';});
+        if(localTpl&&localTpl.valeur&&(!cloudTpl||!cloudTpl.valeur||(localTpl.updated_at||(localTs||''))>=(cloudTpl.updated_at||''))){
+          cloudData.templates=_state.templates;
+        }
         _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},cloudData);
         _initCounters();
         await idbSet('state',_state);
@@ -2965,7 +2975,16 @@ var Contrats = (function(){
     document.getElementById('tpl-save').onclick=async function(){
       var c=document.getElementById('tpl-ed').innerHTML;
       await DB.put('templates',{id:'main',cle:'main',valeur:c});
-      U.toast('Modèle sauvegardé','success');U.closeModal();
+      // Forcer la sauvegarde cloud immédiatement pour que le modèle
+      // soit disponible depuis tous les appareils sans attendre le bouton header
+      U.toast('Modèle sauvegardé — synchronisation en cours…','success');
+      U.closeModal();
+      // Sauvegarde cloud en arrière-plan (non bloquante)
+      DB.saveToCloud().then(function(){
+        U.toast('Modèle synchronisé en ligne ✓','success');
+      }).catch(function(e){
+        U.toast('Modèle sauvegardé localement (sync cloud échouée : cliquez sur Sauvegarder)','warning');
+      });
     };
     document.querySelectorAll('[data-var]').forEach(function(btn){
       btn.onclick=function(){var ed=document.getElementById('tpl-ed');ed.focus();document.execCommand('insertText',false,btn.dataset.var);};
