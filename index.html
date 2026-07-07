@@ -2865,7 +2865,8 @@ var Contrats = (function(){
       }).join('')+
       '<tr style="background:#f0f4ff;font-weight:bold"><td colspan="3" style="padding:.3rem .6rem;border:1px solid #ddd">Total</td><td style="padding:.3rem .6rem;border:1px solid #ddd">'+nj+' j. accueil + '+np+' j. prépa + '+nd+' demi-j.'+(equivReunions>0?' + '+U.fmtNum(equivReunions,2)+' j. réunion':'')+' = <strong>'+U.fmtNum(equivTotal,2)+' j. équivalent</strong></td></tr>'+
     '</tbody></table>';
-    var tplRaw=await DB.get('templates','main');
+    var allTpls2=await DB.getAll('templates');
+    var tplRaw=allTpls2.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=tplRaw?tplRaw.valeur:TPL_DEFAULT;
     // Récupérer la signature du président pour l'injecter dans le contrat
     var sigUrl=await DB.getParam('p_sig_url','');
@@ -2939,7 +2940,8 @@ var Contrats = (function(){
   }
 
   async function openEditTpl(){
-    var saved=await DB.get('templates','main');
+    var allTpls=await DB.getAll('templates');
+    var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=saved?saved.valeur:TPL_DEFAULT;
     var vars=['{{nom}}','{{prenom}}','{{date_naissance}}','{{lieu_naissance}}','{{adresse}}','{{nss}}','{{bafa_statut}}','{{periode}}','{{nb_jours}}','{{nb_demi_journees}}','{{nb_reunion_prepa}}','{{nb_jours_total}}','{{periode_essai}}','{{tableau_jours}}','{{date_signature}}','{{numero_contrat}}','{{asso_nom}}','{{asso_adresse}}','{{asso_siret}}','{{asso_resp}}','{{signature_president}}'];
     U.modal({
@@ -2962,7 +2964,7 @@ var Contrats = (function(){
     document.getElementById('tpl-reset').onclick=async function(){var ok=await U.confirm({title:'Restaurer le modèle ?',body:'Le modèle personnalisé sera remplacé.',ok:'Restaurer',danger:false});if(ok)document.getElementById('tpl-ed').innerHTML=TPL_DEFAULT;};
     document.getElementById('tpl-save').onclick=async function(){
       var c=document.getElementById('tpl-ed').innerHTML;
-      await DB.put('templates',{cle:'main',valeur:c});
+      await DB.put('templates',{id:'main',cle:'main',valeur:c});
       U.toast('Modèle sauvegardé','success');U.closeModal();
     };
     document.querySelectorAll('[data-var]').forEach(function(btn){
