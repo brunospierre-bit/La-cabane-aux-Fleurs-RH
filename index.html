@@ -311,9 +311,15 @@ textarea.form-control{resize:vertical;min-height:80px}
 .sb-overlay.on{display:block}
 
 /* ===== PRINT ===== */
+.ql-editor{min-height:320px;font-family:Arial,sans-serif;font-size:11pt;line-height:1.6}
+.ql-toolbar{background:var(--gray-50);border-color:var(--border)!important;border-radius:var(--radius) var(--radius) 0 0}
+.ql-container{border-color:var(--border)!important;border-radius:0 0 var(--radius) var(--radius);background:#fff}
+.ql-snow .ql-picker{color:var(--text)}
 @media print{.sidebar,.topbar,.page-actions,.btn,.modal-bg,.toast-wrap,#lock-screen{display:none!important}.main-wrap{display:block!important}.page-section{display:block!important}.card{box-shadow:none;border:1px solid #ccc}body{background:#fff}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
 </head>
 <body>
 
@@ -2953,89 +2959,117 @@ var Contrats = (function(){
     var allTpls=await DB.getAll('templates');
     var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=saved?saved.valeur:TPL_DEFAULT;
-    var vars=['{{nom}}','{{prenom}}','{{date_naissance}}','{{lieu_naissance}}','{{adresse}}',
-      '{{nss}}','{{bafa_statut}}','{{periode}}','{{nb_jours}}','{{nb_demi_journees}}',
-      '{{nb_reunion_prepa}}','{{nb_jours_total}}','{{periode_essai}}','{{tableau_jours}}',
-      '{{date_signature}}','{{numero_contrat}}','{{asso_nom}}','{{asso_adresse}}',
-      '{{asso_siret}}','{{asso_resp}}','{{signature_president}}'];
+
+    // Variables disponibles (insérables via boutons)
+    var vars=[
+      {v:'{{nom}}',l:'Nom'},
+      {v:'{{prenom}}',l:'Prénom'},
+      {v:'{{date_naissance}}',l:'Date naissance'},
+      {v:'{{lieu_naissance}}',l:'Lieu naissance'},
+      {v:'{{adresse}}',l:'Adresse'},
+      {v:'{{nss}}',l:'N° SS'},
+      {v:'{{bafa_statut}}',l:'Statut BAFA'},
+      {v:'{{periode}}',l:'Période'},
+      {v:'{{nb_jours}}',l:'Nb jours accueil'},
+      {v:'{{nb_demi_journees}}',l:'Demi-journées'},
+      {v:'{{nb_reunion_prepa}}',l:'Réunions prépa'},
+      {v:'{{nb_jours_total}}',l:'Total jours équiv.'},
+      {v:'{{periode_essai}}',l:'Période d\'essai'},
+      {v:'{{date_signature}}',l:'Date signature'},
+      {v:'{{numero_contrat}}',l:'N° contrat'},
+      {v:'{{asso_nom}}',l:'Nom association'},
+      {v:'{{asso_adresse}}',l:'Adresse asso.'},
+      {v:'{{asso_siret}}',l:'SIRET'},
+      {v:'{{asso_resp}}',l:'Responsable'},
+      {v:'{{signature_president}}',l:'Signature président'},
+      {v:'{{tableau_jours}}',l:'Tableau des jours'},
+    ];
 
     U.modal({
-      title:'Éditeur de modèle HTML',
+      title:'Éditeur du modèle de contrat',
       size:'xl',
       body:
-        '<p class="text-sm text-m mb2">Modifiez le HTML directement. Cliquez sur une variable pour l\'insérer à la position du curseur. L\'aperçu se met à jour en temps réel.</p>'+
-        '<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.6rem">'+
-          vars.map(function(v){return'<button class="btn btn-xs" style="background:var(--navy);color:#fff;font-family:monospace;font-size:.65rem" data-var="'+v+'">'+v+'</button>';}).join('')+
+        '<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i>'+
+        'Éditeur de texte comme Word. Utilisez les boutons ci-dessous pour insérer les variables (nom du salarié, dates, etc.).</div>'+
+        '<div style="margin-bottom:.6rem">'+
+          '<div style="font-size:.72rem;font-weight:600;color:var(--text-m);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em">Variables à insérer</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:.25rem">'+
+            vars.map(function(v){
+              return'<button class="btn btn-xs btn-outline tpl-var-btn" data-var="'+v.v+'" title="'+v.v+'">'+v.l+'</button>';
+            }).join('')+
+          '</div>'+
         '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;height:420px">'+
-          '<div style="display:flex;flex-direction:column">'+
-            '<div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.3rem">'+
-              '<span style="font-size:.75rem;font-weight:600;color:var(--text-m)">CODE HTML</span>'+
-              '<button class="btn btn-ghost btn-xs" id="tpl-bold" title="Gras">&lt;strong&gt;</button>'+
-              '<button class="btn btn-ghost btn-xs" id="tpl-it" title="Italique">&lt;em&gt;</button>'+
-              '<button class="btn btn-ghost btn-xs" id="tpl-ul" title="Souligné">&lt;u&gt;</button>'+
-              '<button class="btn btn-outline btn-xs" id="tpl-reset" style="margin-left:auto"><i class="ti ti-refresh"></i> Défaut</button>'+
-            '</div>'+
-            '<textarea id="tpl-ed" spellcheck="false" style="flex:1;width:100%;font-family:ui-monospace,monospace;font-size:.75rem;line-height:1.5;padding:.6rem;border:1px solid var(--border);border-radius:var(--radius);resize:none;outline:none;background:#1a1b2e;color:#c9d1d9;tab-size:2"></textarea>'+
-          '</div>'+
-          '<div style="display:flex;flex-direction:column">'+
-            '<div style="font-size:.75rem;font-weight:600;color:var(--text-m);margin-bottom:.3rem">APERÇU</div>'+
-            '<div id="tpl-preview" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:.75rem;background:#fff;font-size:.78rem"></div>'+
-          '</div>'+
+        '<div id="quill-editor-wrap">'+
+          '<div id="quill-ed"></div>'+
         '</div>',
-      footer:'<button class="btn btn-ghost" id="tpl-cancel">Annuler</button>'+
-             '<button class="btn btn-primary" id="tpl-save"><i class="ti ti-device-floppy"></i> Sauvegarder</button>'
+      footer:
+        '<button class="btn btn-ghost" id="tpl-cancel">Annuler</button>'+
+        '<button class="btn btn-outline btn-sm" id="tpl-reset"><i class="ti ti-refresh"></i> Restaurer modèle par défaut</button>'+
+        '<button class="btn btn-primary" id="tpl-save"><i class="ti ti-device-floppy"></i> Sauvegarder</button>'
     });
 
-    // Remplir le textarea avec le HTML brut (pas innerHTML — évite la pollution navigateur)
-    var ed=document.getElementById('tpl-ed');
-    var prev=document.getElementById('tpl-preview');
-    ed.value=tpl;
+    // Initialiser Quill après que la modale soit dans le DOM
+    setTimeout(function(){
+      if(typeof Quill === 'undefined'){
+        document.getElementById('quill-ed').innerHTML =
+          '<div class="alert alert-danger"><i class="ti ti-x"></i> Quill non chargé. Vérifiez votre connexion internet.</div>';
+        return;
+      }
 
-    // Aperçu temps réel
-    function _preview(){ try{prev.innerHTML=ed.value;}catch(e){prev.textContent='HTML invalide';} }
-    _preview();
-    ed.addEventListener('input',_preview);
+      var quill = new Quill('#quill-ed', {
+        theme: 'snow',
+        modules:{
+          toolbar:[
+            [{header:[1,2,3,false]}],
+            ['bold','italic','underline'],
+            [{color:[]},{background:[]}],
+            [{align:[]}],
+            [{list:'ordered'},{list:'bullet'}],
+            ['clean']
+          ]
+        }
+      });
 
-    // Insérer balises HTML autour de la sélection
-    function _wrap(before,after){
-      var s=ed.selectionStart,e2=ed.selectionEnd,sel=ed.value.substring(s,e2);
-      if(sel){ed.value=ed.value.substring(0,s)+before+sel+after+ed.value.substring(e2);ed.selectionStart=s;ed.selectionEnd=e2+before.length+after.length;}
-      else{ed.value=ed.value.substring(0,s)+before+after+ed.value.substring(e2);ed.selectionStart=ed.selectionEnd=s+before.length;}
-      ed.focus();_preview();
-    }
-    document.getElementById('tpl-bold').onclick=function(){_wrap('<strong>','</strong>');};
-    document.getElementById('tpl-it').onclick=function(){_wrap('<em>','</em>');};
-    document.getElementById('tpl-ul').onclick=function(){_wrap('<u>','</u>');};
+      // Charger le contenu existant dans Quill
+      // Quill ne comprend pas le HTML arbitraire directement — on passe par un div temporaire
+      var tmp=document.createElement('div');
+      tmp.innerHTML=tpl;
+      quill.root.innerHTML=tmp.innerHTML;
 
-    // Variables : insérer à la position du curseur
-    document.querySelectorAll('[data-var]').forEach(function(btn){
-      btn.onclick=function(){
-        var s=ed.selectionStart,e2=ed.selectionEnd,v=btn.dataset.var;
-        ed.value=ed.value.substring(0,s)+v+ed.value.substring(e2);
-        ed.selectionStart=ed.selectionEnd=s+v.length;
-        ed.focus();_preview();
+      // Insérer une variable à la position du curseur
+      document.querySelectorAll('.tpl-var-btn').forEach(function(btn){
+        btn.onclick=function(){
+          var range=quill.getSelection(true);
+          quill.insertText(range?range.index:quill.getLength(), btn.dataset.var, 'user');
+          quill.setSelection((range?range.index:quill.getLength())+btn.dataset.var.length);
+        };
+      });
+
+      // Restaurer le modèle par défaut
+      document.getElementById('tpl-reset').onclick=async function(){
+        var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Votre modèle personnalisé sera remplacé.',ok:'Restaurer',danger:false});
+        if(ok){
+          var t=document.createElement('div'); t.innerHTML=TPL_DEFAULT;
+          quill.root.innerHTML=t.innerHTML;
+        }
       };
-    });
 
-    // Restaurer modèle par défaut
-    document.getElementById('tpl-reset').onclick=async function(){
-      var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Votre modèle personnalisé sera remplacé.',ok:'Restaurer',danger:false});
-      if(ok){ed.value=TPL_DEFAULT;_preview();}
-    };
+      document.getElementById('tpl-cancel').onclick=U.closeModal;
 
-    document.getElementById('tpl-cancel').onclick=U.closeModal;
+      document.getElementById('tpl-save').onclick=async function(){
+        // Récupérer le HTML produit par Quill (propre, sans pollution)
+        var content=quill.root.innerHTML;
+        // Nettoyer les balises vides laissées par Quill
+        content=content.replace(/<p><br><\/p>/g,'<br>').trim();
+        await DB.put('templates',{id:'main',cle:'main',valeur:content});
+        U.toast('Modèle sauvegardé — synchronisation…','success');
+        U.closeModal();
+        DB.saveToCloud()
+          .then(function(){U.toast('Modèle synchronisé en ligne \u2713','success');})
+          .catch(function(){U.toast('Sauvegardé localement — cliquez sur Sauvegarder pour synchroniser','warning');});
+      };
 
-    // Sauvegarder : lire ed.value (HTML brut, sans pollution navigateur)
-    document.getElementById('tpl-save').onclick=async function(){
-      var c=ed.value; // textarea.value = HTML pur sans <div>/<b> injectés par le navigateur
-      await DB.put('templates',{id:'main',cle:'main',valeur:c});
-      U.toast('Modèle sauvegardé — synchronisation…','success');
-      U.closeModal();
-      DB.saveToCloud()
-        .then(function(){U.toast('Modèle synchronisé en ligne \u2713','success');})
-        .catch(function(){U.toast('Sauvegardé localement — cliquez sur Sauvegarder pour synchroniser','warning');});
-    };
+    }, 100); // laisser 100ms au DOM pour rendre la modale
   }
 
 
