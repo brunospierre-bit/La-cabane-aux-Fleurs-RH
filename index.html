@@ -648,7 +648,7 @@ const DB = (function(){
     localStorage.setItem(CFG_KEY,JSON.stringify(cfg));
   }
 
-  // ── REST Supabase direct (sans client JS) ─────────────────────
+  // ── REST Supabase direct (sans client JS, évite les timeouts) ──
   function _cfg(){ return getSupaConfig(); }
   function _hdr(){
     var k=(_cfg()||{}).anonKey||'';
@@ -672,11 +672,9 @@ const DB = (function(){
     if(!r.ok){ var t=await r.text(); throw new Error('UPSERT '+r.status+': '+t.slice(0,300)); }
   }
 
-  // ── Extraction / réinjection des docs base64 ─────────────────
-  // Les champs doc_* restent en local uniquement (trop volumineux pour Supabase)
+  // ── Docs base64 : restent en local uniquement (trop volumineux) ──
   var DOC_FIELDS=['doc_nss','doc_casier','doc_bafa','doc_rib'];
 
-  // Retirer les docs d'une liste de salariés (pour envoi cloud)
   function _stripDocs(salaries){
     return (salaries||[]).map(function(s){
       var c=Object.assign({},s);
@@ -685,7 +683,6 @@ const DB = (function(){
     });
   }
 
-  // Fusionner les docs locaux dans les salariés chargés depuis cloud
   function _mergeDocs(cloudSals, localSals){
     return (cloudSals||[]).map(function(cs){
       var ls=(localSals||[]).find(function(s){return s.id===cs.id;});
@@ -696,10 +693,8 @@ const DB = (function(){
     });
   }
 
-  // Payload léger pour le cloud
+  // Payload léger envoyé au cloud : URLs Storage uniquement, sans base64 ni journal
   function _cloudPayload(){
-    // Salariés : inclure les URLs Storage, exclure base64 résiduelles
-    // Inclure docs_paie et docs_fin (URLs Storage uniquement)
     var sals=(_state.salaries||[]).map(function(s){
       var c=Object.assign({},s);
       DOC_FIELDS.forEach(function(f){ if(c[f]&&c[f].startsWith('data:')) delete c[f]; });
@@ -715,10 +710,11 @@ const DB = (function(){
       contrats:     _state.contrats     ||[],
       templates:    _state.templates    ||[],
       params:       _state.params       ||[]
+      // journal exclu : croît sans limite, reste local uniquement
     };
   }
 
-  // ── IndexedDB ─────────────────────────────────────────────────
+  // ── IndexedDB (cache local) ─────────────────────────────────────
   var _idb=null;
   function openIDB(){
     return new Promise(function(res,rej){
@@ -763,7 +759,7 @@ const DB = (function(){
     });
   }
 
-  // ── Bouton sauvegarde ─────────────────────────────────────────
+  // ── Bouton de sauvegarde (header) ───────────────────────────────
   function _btn(){ return document.getElementById('btn-cloud-save'); }
   function _ico(){ return document.getElementById('save-icon'); }
   function _lbl(){ return document.getElementById('save-lbl'); }
@@ -820,15 +816,13 @@ const DB = (function(){
 
   function _markUnsaved(){ _unsaved=true; setTimeout(function(){_setBtnState('unsaved');},0); }
 
-  // ── DÉMARRAGE ─────────────────────────────────────────────────
+  // ── DÉMARRAGE ────────────────────────────────────────────────────
   async function open(){
-    // 1. IndexedDB local immédiat (< 10ms)
     var local=await idbGet('state');
     if(local){
       _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},local);
       _initCounters();
     }
-    // 2. Binder bouton + sync cloud en arrière-plan
     setTimeout(function(){
       var btn=_btn();
       if(btn) btn.onclick=saveToCloud;
@@ -840,7 +834,7 @@ const DB = (function(){
     return true;
   }
 
-  // Sync cloud → local si version plus récente
+  // Télécharger la version cloud si elle est plus récente que le local
   async function _syncFromCloud(){
     var cfg=getSupaConfig(); if(!cfg||!cfg.url) return;
     try{
@@ -850,10 +844,11 @@ const DB = (function(){
       var localTs=await idbGet('state_ts')||'';
       if(!localTs||cloudTs>localTs){
         var cloudData=rows[0].data;
-        // Réinjecter les docs locaux (non stockés en cloud)
+        // Réinjecter les docs locaux (base64 non stockés en cloud)
         cloudData.salaries=_mergeDocs(cloudData.salaries, _state.salaries);
+        // Garder le journal local (non stocké cloud)
         cloudData.journal=_state.journal||[];
-        // Préserver le modèle de contrat local s'il est plus récent
+        // Préserver le modèle de contrat local s'il est plus récent que le cloud
         var localTpl=(_state.templates||[]).find(function(t){return t.id==='main'||t.cle==='main';});
         var cloudTpl=((cloudData.templates)||[]).find(function(t){return t.id==='main'||t.cle==='main';});
         if(localTpl&&localTpl.valeur&&(!cloudTpl||!cloudTpl.valeur||(localTpl.updated_at||(localTs||''))>=(cloudTpl.updated_at||''))){
@@ -874,15 +869,15 @@ const DB = (function(){
 
   function _refreshCurrentPage(){
     try{
-      var p=(document.querySelector('.nav-item.active')||{}).dataset&&document.querySelector('.nav-item.active').dataset.page;
+      var activeEl=document.querySelector('.nav-item.active');
+      var p=activeEl&&activeEl.dataset?activeEl.dataset.page:null;
       if(!p) return;
       var M={dashboard:typeof Dashboard!=='undefined'?Dashboard:null,salaries:typeof Salaries!=='undefined'?Salaries:null,planning:typeof Planning!=='undefined'?Planning:null,suivi:typeof Suivi!=='undefined'?Suivi:null,couts:typeof Couts!=='undefined'?Couts:null};
       if(M[p]&&M[p].refresh) M[p].refresh();
     } catch(e){}
   }
 
-  // ── SAUVEGARDE MANUELLE ───────────────────────────────────────
-    // Migrer un document base64 vers Supabase Storage, retourner l'URL publique
+  // ── Migration des documents base64 vers Supabase Storage ─────────
   async function _migrateDocToStorage(b64, salId, docKey){
     var cfg=getSupaConfig();
     if(!cfg||!cfg.url||typeof supabase==='undefined') return b64;
@@ -909,7 +904,6 @@ const DB = (function(){
     }
   }
 
-  // Migrer tous les documents base64 de tous les salariés
   async function _migrateAllDocs(){
     var cfg=getSupaConfig(); if(!cfg||!cfg.url) return;
     var changed=false;
@@ -927,6 +921,7 @@ const DB = (function(){
     return changed;
   }
 
+  // ── SAUVEGARDE MANUELLE (bouton header) ───────────────────────────
   async function saveToCloud(){
     var cfg=getSupaConfig();
     if(!cfg||!cfg.url){
@@ -935,7 +930,6 @@ const DB = (function(){
     }
     _setBtnState('saving');
     try{
-      // 1. Compter les docs encore en base64
       var b64count=(_state.salaries||[]).reduce(function(n,s){
         return n+DOC_FIELDS.filter(function(f){return s[f]&&s[f].startsWith('data:');}).length;
       },0);
@@ -943,222 +937,11 @@ const DB = (function(){
         console.log('[DB] Migration de',b64count,'document(s) vers Storage\u2026');
         await _migrateAllDocs();
       }
-      // 2. Payload cloud (URLs Storage incluses, base64 résiduelles exclues, journal exclu)
       var payload=_cloudPayload();
       var sz=JSON.stringify(payload).length;
       console.log('[DB] Payload:',sz,'chars (~'+(sz/1024).toFixed(1)+' Ko)');
-      // 3. Envoyer
       var ts=new Date().toISOString();
       await _upsert('app_data',[{id:1,data:payload,updated_at:ts}]);
-      await idbSet('state_ts',ts);
-      _unsaved=false;
-      _setBtnState('saved');
-    } catch(e){
-      console.error('[DB] saveToCloud:',e.message||e);
-      _setBtnState('error');
-      _toast('<strong>Erreur :</strong> '+e.message);
-    }
-  }
-
-  function _cloudPayload(){
-    // Salariés : inclure les URLs Storage, exclure les base64 résiduelles et le journal
-    var sals=(_state.salaries||[]).map(function(s){
-      var c=Object.assign({},s);
-      DOC_FIELDS.forEach(function(f){
-        if(c[f]&&c[f].startsWith('data:')) delete c[f];
-        // Les URLs https://...supabase.co/... sont conservées → visibles sur tout appareil
-      });
-      return c;
-    });
-    return {
-      salaries:sals,
-      journees:_state.journees||[],
-      affectations:_state.affectations||[],
-      preparations:_state.preparations||[],
-      contrats:_state.contrats||[],
-      templates:_state.templates||[],
-      params:_state.params||[]
-    };
-  }
-
-
-  // ── IndexedDB ─────────────────────────────────────────────────
-  var _idb=null;
-  function openIDB(){
-    return new Promise(function(res,rej){
-      if(_idb){res(_idb);return;}
-      var r=indexedDB.open('cabane_v3',1);
-      r.onupgradeneeded=function(e){
-        var db=e.target.result;
-        if(!db.objectStoreNames.contains('kv'))
-          db.createObjectStore('kv',{keyPath:'k'});
-      };
-      r.onsuccess=function(e){_idb=e.target.result;res(_idb);};
-      r.onerror=function(e){rej(e.target.error);};
-    });
-  }
-  function idbGet(k){
-    return openIDB().then(function(db){
-      return new Promise(function(res){
-        var r=db.transaction('kv','readonly').objectStore('kv').get(k);
-        r.onsuccess=function(e){res(e.target.result?e.target.result.v:null);};
-        r.onerror=function(){res(null);};
-      });
-    }).catch(function(){return null;});
-  }
-  function idbSet(k,v){
-    return openIDB().then(function(db){
-      return new Promise(function(res){
-        var r=db.transaction('kv','readwrite').objectStore('kv').put({k:k,v:v});
-        r.onsuccess=function(){res();};r.onerror=function(){res();};
-      });
-    }).catch(function(){});
-  }
-
-  // ── État en mémoire ───────────────────────────────────────────
-  var _state={salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]};
-  var _nextIds={};
-  var _unsaved=false;
-
-  function _initCounters(){
-    ['salaries','journees','affectations','preparations','contrats','journal'].forEach(function(s){
-      var max=(_state[s]||[]).reduce(function(m,r){return Math.max(m,r.id||0);},0);
-      _nextIds[s]=max+1;
-    });
-  }
-
-  // ── Bouton sauvegarde ─────────────────────────────────────────
-  function _btn(){ return document.getElementById('btn-cloud-save'); }
-  function _ico(){ return document.getElementById('save-icon'); }
-  function _lbl(){ return document.getElementById('save-lbl'); }
-
-  function _setBtnState(state){
-    var btn=_btn(), ico=_ico(), lbl=_lbl();
-    if(!btn) return;
-    btn.style.background=''; btn.style.borderColor='';
-    btn.disabled=false; btn.style.opacity='1';
-    if(state==='idle'){
-      btn.style.opacity='.85';
-      if(ico)ico.className='ti ti-cloud-upload';
-      if(lbl)lbl.textContent='Sauvegarder';
-    } else if(state==='unsaved'){
-      if(ico)ico.className='ti ti-cloud-upload';
-      if(lbl)lbl.textContent='Sauvegarder \u2731';
-    } else if(state==='saving'){
-      btn.disabled=true; btn.style.opacity='.6';
-      if(ico)ico.className='ti ti-loader-2';
-      if(lbl)lbl.textContent='Envoi\u2026';
-    } else if(state==='saved'){
-      btn.style.background='var(--success)'; btn.style.borderColor='var(--success)';
-      if(ico)ico.className='ti ti-cloud-check';
-      if(lbl)lbl.textContent='Sauvegard\xe9 \u2713';
-      setTimeout(function(){
-        btn.style.background=''; btn.style.borderColor='';
-        _setBtnState(_unsaved?'unsaved':'idle');
-      },2500);
-    } else if(state==='error'){
-      btn.style.background='var(--danger)'; btn.style.borderColor='var(--danger)';
-      if(ico)ico.className='ti ti-cloud-x';
-      if(lbl)lbl.textContent='R\xe9essayer';
-      setTimeout(function(){
-        btn.style.background=''; btn.style.borderColor='';
-        _setBtnState('unsaved');
-      },4000);
-    } else if(state==='offline'){
-      btn.style.background='var(--warning)'; btn.style.borderColor='var(--warning)';
-      if(ico)ico.className='ti ti-settings';
-      if(lbl)lbl.textContent='Configurer';
-      var b=_btn(); if(b) b.onclick=function(){App.go('parametrage');};
-    }
-  }
-
-  function _toast(msg){
-    var wrap=document.getElementById('toasts'); if(!wrap) return;
-    var el=document.createElement('div');
-    el.className='toast danger';
-    el.style.cssText='max-width:480px;font-size:.78rem;word-break:break-word';
-    el.innerHTML='<i class="ti ti-cloud-x"></i><span>'+msg+'</span>';
-    wrap.appendChild(el);
-    setTimeout(function(){el.remove();},10000);
-  }
-
-  function _markUnsaved(){ _unsaved=true; setTimeout(function(){_setBtnState('unsaved');},0); }
-
-  // ── DÉMARRAGE ─────────────────────────────────────────────────
-  async function open(){
-    // 1. IndexedDB local immédiat (< 10ms)
-    var local=await idbGet('state');
-    if(local){
-      _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},local);
-      _initCounters();
-    }
-    // 2. Binder bouton + sync cloud en arrière-plan
-    setTimeout(function(){
-      var btn=_btn();
-      if(btn) btn.onclick=saveToCloud;
-      var cfg=getSupaConfig();
-      if(!cfg||!cfg.url){ _setBtnState('offline'); return; }
-      _setBtnState('idle');
-      _syncFromCloud();
-    },0);
-    return true;
-  }
-
-  // Sync cloud → local si version plus récente
-  async function _syncFromCloud(){
-    var cfg=getSupaConfig(); if(!cfg||!cfg.url) return;
-    try{
-      var rows=await _get('app_data','select=data,updated_at&id=eq.1&limit=1');
-      if(!rows||!rows.length||!rows[0].data) return;
-      var cloudTs=rows[0].updated_at||'';
-      var localTs=await idbGet('state_ts')||'';
-      if(!localTs||cloudTs>localTs){
-        var cloudData=rows[0].data;
-        // Réinjecter les docs locaux (non stockés en cloud)
-        cloudData.salaries=_mergeDocs(cloudData.salaries, _state.salaries);
-        cloudData.journal=_state.journal||[];
-        // Préserver le modèle de contrat local s'il est plus récent
-        var localTpl=(_state.templates||[]).find(function(t){return t.id==='main'||t.cle==='main';});
-        var cloudTpl=((cloudData.templates)||[]).find(function(t){return t.id==='main'||t.cle==='main';});
-        if(localTpl&&localTpl.valeur&&(!cloudTpl||!cloudTpl.valeur||(localTpl.updated_at||(localTs||''))>=(cloudTpl.updated_at||''))){
-          cloudData.templates=_state.templates;
-        }
-        _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},cloudData);
-        _initCounters();
-        await idbSet('state',_state);
-        await idbSet('state_ts',cloudTs);
-        _refreshCurrentPage();
-      }
-      _setBtnState(_unsaved?'unsaved':'idle');
-    } catch(e){
-      console.warn('[DB] _syncFromCloud:',e.message||e);
-      _setBtnState(_unsaved?'unsaved':'idle');
-    }
-  }
-
-  function _refreshCurrentPage(){
-    try{
-      var p=(document.querySelector('.nav-item.active')||{}).dataset&&document.querySelector('.nav-item.active').dataset.page;
-      if(!p) return;
-      var M={dashboard:typeof Dashboard!=='undefined'?Dashboard:null,salaries:typeof Salaries!=='undefined'?Salaries:null,planning:typeof Planning!=='undefined'?Planning:null,suivi:typeof Suivi!=='undefined'?Suivi:null,couts:typeof Couts!=='undefined'?Couts:null};
-      if(M[p]&&M[p].refresh) M[p].refresh();
-    } catch(e){}
-  }
-
-  // ── SAUVEGARDE MANUELLE ───────────────────────────────────────
-  async function saveToCloud(){
-    var cfg=getSupaConfig();
-    if(!cfg||!cfg.url){
-      alert('Supabase non configuré.\nAllez dans Paramétrage → Sécurité.');
-      return;
-    }
-    _setBtnState('saving');
-    try{
-      var payload=_cloudPayload();
-      var payloadStr=JSON.stringify(payload);
-      console.log('[DB] Payload cloud:',payloadStr.length,'chars (~'+(payloadStr.length/1024).toFixed(1)+' Ko) — sans doc_* ni journal');
-      var ts=new Date().toISOString();
-      await _upsert('app_data',[{id:1, data:payload, updated_at:ts}]);
       await idbSet('state_ts',ts);
       _unsaved=false;
       _setBtnState('saved');
@@ -1174,13 +957,13 @@ const DB = (function(){
     await saveToCloud();
   }
 
-  // ── Écriture locale immédiate ─────────────────────────────────
+  // ── Écriture locale immédiate (instantanée) ───────────────────────
   function _write(){
     idbSet('state',_state);
     _markUnsaved();
   }
 
-  // ── CRUD ──────────────────────────────────────────────────────
+  // ── CRUD ───────────────────────────────────────────────────────
   function getAll(s){ return Promise.resolve((_state[s]||[]).map(function(r){return Object.assign({},r);})); }
   function get(s,id){ var r=(_state[s]||[]).find(function(x){return x.id===id;}); return Promise.resolve(r?Object.assign({},r):null); }
   function getByIndex(s,f,v){ return Promise.resolve((_state[s]||[]).filter(function(r){return r[f]===v;}).map(function(r){return Object.assign({},r);})); }
@@ -1211,6 +994,7 @@ const DB = (function(){
     _write(); return Promise.resolve();
   }
 
+  // ── Config mot de passe ───────────────────────────────────────
   async function getConfig(){
     var local=await idbGet('app_config'); if(local) return local;
     var cfg=getSupaConfig(); if(!cfg||!cfg.url) return null;
@@ -1228,7 +1012,7 @@ const DB = (function(){
     catch(e){ console.warn('[DB] saveConfig:',e.message||e); }
   }
 
-  // ── Upload fichiers Storage ───────────────────────────────────
+  // ── Upload fichiers Storage ────────────────────────────────────
   async function uploadFile(file,pathHint){
     var cfg=getSupaConfig();
     if(!cfg||!cfg.url||typeof supabase==='undefined') return await _b64(file);
@@ -1262,6 +1046,7 @@ const DB = (function(){
     } catch(e){ console.warn('[DB] deleteFile:',e.message||e); }
   }
 
+  // ── Utilitaires ──────────────────────────────────────────────
   function nextNumContrat(){
     return getAll('contrats').then(function(list){
       if(!list.length)return'CTR-0001';
@@ -1290,6 +1075,7 @@ const DB = (function(){
     STORES:{SALARIES:'salaries',JOURNEES:'journees',AFFECTATIONS:'affectations',PREPARATIONS:'preparations',CONTRATS:'contrats',JOURNAL:'journal',TEMPLATES:'templates'}
   };
 })();
+
 
 // ===== UTILITAIRES =====
 const U = (function(){
@@ -2659,7 +2445,7 @@ var Planning = (function(){
 
 // ===== CONTRATS =====
 var Contrats = (function(){
-  var TPL_DEFAULT='<div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:2rem;line-height:1.6;font-size:11pt"><div style="text-align:center;margin-bottom:2rem"><h1 style="font-size:16pt;text-transform:uppercase">Contrat à Durée Déterminée</h1><p style="color:#666;font-size:9pt">Convention collective ECLAT (IDCC 1518) — N° {{numero_contrat}} — {{date_signature}}</p></div><div style="border:1px solid #ddd;padding:1rem;margin-bottom:1rem;border-radius:6px;background:#fafafa"><h2 style="font-size:12pt;margin-bottom:.5rem">L\'Employeur</h2><p><strong>{{asso_nom}}</strong></p><p>{{asso_adresse}}</p><p>SIRET : {{asso_siret}}</p><p>Représentée par : {{asso_resp}}</p></div><div style="border:1px solid #ddd;padding:1rem;margin-bottom:1rem;border-radius:6px;background:#fafafa"><h2 style="font-size:12pt;margin-bottom:.5rem">Le Salarié</h2><p><strong>{{prenom}} {{nom}}</strong></p><p>Né(e) le {{date_naissance}} à {{lieu_naissance}}</p><p>Adresse : {{adresse}}</p><p>N° SS : {{nss}}</p><p>BAFA : {{bafa_statut}}</p></div><div style="border:1px solid #ddd;padding:1rem;margin-bottom:1rem;border-radius:6px"><h2 style="font-size:12pt;margin-bottom:.5rem">Conditions d\'emploi</h2><p>Période : <strong>{{periode}}</strong></p><p>Jours d\'accueil : <strong>{{nb_jours}}</strong> — Demi-journées prépa : <strong>{{nb_demi_journees}}</strong> — Réunions prépa : <strong>{{nb_reunion_prepa}} j. équiv.</strong></p><p>Total équivalent jours : <strong>{{nb_jours_total}}</strong></p><p>Période d\'essai : <strong>{{periode_essai}}</strong></p></div><div style="border:1px solid #ddd;padding:1rem;margin-bottom:1rem;border-radius:6px"><h2 style="font-size:12pt;margin-bottom:.5rem">Journées de travail</h2>{{tableau_jours}}</div><div style="padding:.75rem;background:#f0f4ff;border-radius:6px;font-size:9pt;margin-bottom:1.5rem"><strong>RGPD :</strong> Données traitées sur base contractuelle (art. 6.1.b RGPD), conservées 5 ans.</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:3rem;margin-top:3rem"><div><p><strong>L\'Employeur</strong></p>{{signature_president}}<div style="border-bottom:1px solid #ccc;margin:1.5rem 0 .2rem"></div><p style="font-size:9pt;color:#777">Signature et cachet</p></div><div><p><strong>Le Salarié</strong></p><p style="color:#777;font-size:9pt">{{prenom}} {{nom}}</p><div style="border-bottom:1px solid #ccc;margin:3rem 0 .2rem"></div><p style="font-size:9pt;color:#777">Lu et approuvé</p></div></div><p style="text-align:center;margin-top:1.5rem;font-size:8pt;color:#aaa">Fait à _____, le {{date_signature}}</p></div>';
+  var TPL_DEFAULT='<div style="font-family:Arial,sans-serif;max-width:750px;margin:0 auto;padding:2rem;line-height:1.6;font-size:10.5pt;color:#1a1a1a">\n\n<div style="text-align:center;margin-bottom:1.5rem">\n<h1 style="font-size:15pt;text-transform:uppercase;color:#3D1F00;margin-bottom:.3rem">Contrat d\'Engagement Éducatif</h1>\n<p style="color:#666;font-size:8.5pt;margin:0">N° {{numero_contrat}} — {{date_signature}}</p>\n<p style="color:#888;font-size:8pt;margin:.4rem 0 0">Pour les personnels pédagogiques occasionnels, conclu en vertu des articles L.432-1 à L.432-6 et D.432-1 à D.432-9 du Code de l\'action sociale et des familles</p>\n</div>\n\n<div style="border:1px solid #ddd;padding:1rem;margin-bottom:.8rem;border-radius:6px;background:#fafafa">\n<h2 style="font-size:11pt;margin-bottom:.5rem;color:#3D1F00">L\'Employeur</h2>\n<p style="margin:.2rem 0">L\'Association <strong>{{asso_nom}}</strong>, dont le siège est situé à {{asso_adresse}}</p>\n<p style="margin:.2rem 0">N° SIRET : {{asso_siret}}</p>\n<p style="margin:.2rem 0">Représentée par ses Co-Président(e)s, <strong>{{asso_resp}}</strong>, dûment habilité(e)s</p>\n<p style="margin:.4rem 0 0;font-size:9pt;font-style:italic">Ci-après dénommée « l\'Employeur »</p>\n</div>\n\n<div style="border:1px solid #ddd;padding:1rem;margin-bottom:.8rem;border-radius:6px;background:#fafafa">\n<h2 style="font-size:11pt;margin-bottom:.5rem;color:#3D1F00">Le Salarié</h2>\n<p style="margin:.2rem 0"><strong>{{prenom}} {{nom}}</strong>, demeurant à {{adresse}}</p>\n<p style="margin:.2rem 0">Né(e) le {{date_naissance}} à {{lieu_naissance}}</p>\n<p style="margin:.2rem 0">N° de Sécurité Sociale : {{nss}}</p>\n<p style="margin:.2rem 0">Statut BAFA : {{bafa_statut}}</p>\n<p style="margin:.4rem 0 0;font-size:9pt;font-style:italic">Ci-après dénommé(e) « le Salarié »</p>\n</div>\n\n<p style="margin:1rem 0;font-weight:600">Il a été convenu ce qui suit :</p>\n\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 1 – ENGAGEMENT</h2>\n<p>Le Salarié est engagé(e) à compter du <strong>{{periode}}\ninclus</strong>, dans le cadre d’un <strong>contrat d’engagement\néducatif (CEE)</strong> régi par les articles <strong>L.432-1 à L.432-6\net D.432-1 à D.432-9 du Code de l’action sociale et des\nfamilles</strong>.</p>\n<p>Le présent contrat est conclu pour l’exercice d’une activité\n<strong>occasionnelle</strong> d’animation au sein d’un accueil\ncollectif de mineurs.</p>\n<p>Le Salarié est engagé aux conditions générales de la\n<strong>Convention Collective Nationale ÉCLAT</strong>, <strong>pour les\nseules dispositions expressément applicables au contrat d’engagement\néducatif</strong>.</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 2 – FONCTION</h2>\n<p>En sa qualité d’animateur(trice), Le Salarié s’engage notamment à\n:</p>\n<ul>\n<li><p>Assurer l’encadrement, l’animation et l’administration du public\naccueilli pendant leur présence.</p></li>\n<li><p>Participer aux réunions de travail : préparation, bilan </p></li>\n<li><p>Réaliser les tâches accessoires suivantes : soins et premiers\nsecours des enfants (assistance sanitaire), économat, surveillance de la\nbaignade, …</p></li>\n</ul>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 3 - PÉRIODE D’ESSAI</h2>\n<p>Le présent contrat comporte une période d’essai correspondant à\n<strong>2/10ᵉ du nombre de jours de travail prévus</strong>, soit\n<strong>{{periode_essai}} jours travaillés</strong>.</p>\n<p>Pendant cette période, chacune des parties pourra mettre fin au\ncontrat <strong>sans indemnité</strong>, conformément aux dispositions\nlégales applicables au CEE.</p>\n<p><strong>ARTICLE 4 - DURÉE DU TRAVAIL, REPOS HEBDOMADAIRE ET\nQUOTIDIEN</strong></p>\n<p>Le Salarié exercera ses fonctions sur une période de\n<strong>{{nb_jours}} jours</strong>, selon les besoins du service et\nl’organisation de l’accueil collectif de mineurs, impliquant une\n<strong>présence continue auprès des publics accueillis</strong>.</p>\n<p>Conformément à l’article <strong>D.432-2</strong> du Code de l’action\nsociale et des familles, Le Salarié bénéficie en principe d’un\n<strong>repos quotidien de 11 heures consécutives</strong>.</p>\n<p>Conformément à l’article <strong>D.432-3</strong> du même code, il\npeut être exceptionnellement dérogé à ce repos quotidien, notamment en\ncas de veillées, de séjours ou de contraintes liées à l’encadrement des\nmineurs.</p>\n<p><strong>Toute période de repos quotidien non prise ouvre droit à un\nrepos compensateur effectif et équivalent</strong>, accordé :</p>\n<ul>\n<li><p>soit pendant la durée du séjour lorsque celui-ci excède trois\njours,</p></li>\n<li><p>soit immédiatement à l’issue du séjour lorsque celui-ci est\ninférieur ou égal à trois jours, selon un <strong>planning établi par\nl’organisateur</strong>.</p></li>\n</ul>\n<p>L’organisateur garantit que les repos compensateurs seront\neffectivement accordés</p>\n<p>Récapitulatif des journées travaillées :</p>\n<p>{{tableau_jours}}</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 5 – REMUNERATION</h2>\n<p>En contrepartie de ses services, Le Salarié percevra une rémunération\n<strong>forfaitaire brute de 78 euros par jour travaillé</strong>,\nconformément au régime du contrat d’engagement éducatif.</p>\n<p>Les fonctions exercées nécessitant une présence continue, la\nnourriture et, le cas échéant, l’hébergement fournis par l’organisateur\nne constituent pas des avantages en nature au sens de la réglementation\nen vigueur.</p>\n<p>Les cotisations sociales sont calculées sur une <strong>assiette\nforfaitaire</strong>, conformément aux dispositions légales applicables\nau CEE.</p>\n<p>Le Salarié a été informé(e) préalablement que l’application d’une\ntelle assiette forfaitaire a pour effet de réduire le montant des\ncotisations versées à la sécurité sociale et, en conséquence, de réduire\nles droits et garanties du salarié en matière notamment de vieillesse\n(retraite de base) et en cas de maladie et maternité/paternité/adoption\n(IJSS versées par la sécurité sociale).</p>\n<p>Le versement du salaire sera effectué le <strong>5 du mois\nsuivant</strong>.</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 6 - LIEU DE TRAVAIL</h2>\n<p>Le Salarié exercera principalement ses fonctions à l’école des Fleurs\n- Janneyrias.</p>\n<p>Le Salarié pourra être appelé(e) à se déplacer en dehors de la localité.</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 7 - CONGÉS PAYÉS</h2>\n<p>Conformément au régime spécifique du contrat d’engagement éducatif,\nLe Salarié ne bénéficie pas de congés payés au sens du Code du\ntravail.</p>\n<p>En contrepartie, une <strong>indemnité compensatrice de\ncongés</strong>, égale à <strong>10 % de la rémunération brute\ntotale</strong>, sera versée en fin de contrat.</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 8 – FORMATION PROFESSIONNELLE</h2>\n<p>Conformément aux dispositions légales et si les conditions d’accès\nsont remplies, les salariés peuvent avoir accès à la formation\nprofessionnelle :</p>\n<p>A l’initiative de l’employeur, le cas échéant, dans le cadre d’un\nplan de développement des compétences et notamment pour répondre à son\nobligation d’adaptation au poste de travail et de son obligation de\nmaintien de la capacité à occuper un emploi ;</p>\n<p>A l’initiative du salarié, notamment par la mobilisation du compte\npersonnel de formation prévu à l’article L. 6323-1 du même code.</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 9 - RUPTURE DU CONTRAT DE TRAVAIL</h2>\n<p>En l’absence d’accord entre les parties, le présent contrat ne pourra\nêtre rompu à l’initiative de l’association avant l’échéance de son terme\nque :</p>\n<ul><li>Pour force majeure,</li><li>Faute grave du Salarié,</li><li>Ou impossibilité pour celui-ci/celle-ci de continuer à exercer ses fonctions.</li></ul>\n<p>En cas de rupture, l’ensemble de la procédure prévue par les\ndispositions légales et conventionnelles doit être respecté.</p>\n<p><strong>ARTICLE 10 - TRAITEMENT DES DONNÉES PERSONNELLES ET\nPROTECTION DES DROITS DU SALARIÉ</strong></p>\n<p>Dans le cadre de la gestion du personnel et de la paie, l’employeur\nest amené à collecter les données personnelles (ex : nom, prénom,\nadresses, numéro de téléphone…) de la salariée. </p>\n<p>Elles font l’objet d’un traitement dont le responsable est La Cabane\naux Fleurs.</p>\n<p>Le trésorier est la personne référente sur le sujet.</p>\n<p> </p>\n<p>Ces données personnelles ne seront traitées ou utilisées que dans la\nmesure où cela est nécessaire pour l’exécution du contrat de travail du\n(de la) salarié(e) ou répondre à une obligation légale et/ou\nréglementaire. Les informations personnelles du (de la) salarié(e)\nseront conservées aussi longtemps que nécessaire à l’exécution du\ncontrat, à l’accomplissement par l’entreprise de ses obligations légales\net réglementaires et à l’exercice des prérogatives lui étant reconnues\npar la loi et la jurisprudence.</p>\n<p>Pendant toute la durée de conservation des données personnelles du\n(de la) salarié(e), l’employeur met en place tous les moyens aptes à\nassurer leur confidentialité et leur sécurité, de manière à empêcher\nleur endommagement, effacement ou accès par des tiers non autorisés.</p>\n<p>L’accès aux données personnelles est strictement limité aux salariés\nde l’entreprise, habilités à les traiter en raison de leurs fonctions.\nLes informations recueillies pourront éventuellement être communiquées à\ndes tiers liés à l’entreprise par contrat pour l’exécution de tâches\nsous-traitées nécessaires à la gestion du contrat. Ces tiers n’ont qu’un\naccès limité aux données et ont l’obligation de les utiliser en\nconformité avec les dispositions de la législation applicable en matière\nde protection des données personnelles.</p>\n<p>Conformément aux dispositions légales et réglementaires applicables,\nvous bénéficiez d’un droit d’accès, de rectification, de portabilité et\nd’effacement de vos données ou encore de limitation du traitement. Vous\npouvez également, pour des motifs légitimes, vous opposer au traitement\ndes données vous concernant.</p>\n<p>Vous pouvez, sous réserve de la production d’un justificatif\nd’identité valide, exercer vos droits, et vous opposer au traitement des\ndonnées vous concernant et disposez du droit de retirer votre\nconsentement à tout moment en contactant le trésorier. En cas de\ndifficulté en lien avec la gestion de ses données personnelles, vous\npouvez contacter la Cnil (plus d’informations sur <a\nhref="http://www.cnil.fr">www.cnil.fr</a>).</p>\n<h2 style="font-size:11.5pt;margin:1.3rem 0 .5rem;padding-bottom:.2rem;border-bottom:2px solid #E06818;color:#3D1F00">ARTICLE 11 - DISPOSITIONS DIVERSES</h2>\n<p>Le Salarié certifie sur l’honneur respecter les conditions définies\naux articles D.432-1 et L.432-4 du Code de l’action sociale et des\nfamilles dans lesquelles un contrat d’engagement éducatif peut être\nconclu.</p>\n<p>Pendant la durée de ce contrat, Le Salarié s’engage à faire connaître\nà l’organisateur, dans les plus brefs délais, tout changement dans sa\nsituation personnelle, en particulier si ce changement rendait\nimpossible l’application du statut de l’engagement éducatif.</p>\n<p>Le Salarié certifie par ailleurs n’avoir encouru aucune condamnation\npour crime ou délit contraire à la probité et aux bonnes mœurs, n\'être\npas frappé(e) de l\'interdiction d’enseigner et n’être pas frappé(e) de\nl’interdiction de participer à la direction et à l’encadrement\nd’institutions ou d’organismes de vacances et de loisirs pour les\nmineurs.</p>\n<p>D’une manière générale, le présent contrat est régi par les\ndispositions du <strong>Code de l’action sociale et des familles\nrelatives au contrat d’engagement éducatif</strong>, ainsi que, pour les\nseules dispositions applicables, par le Code du travail et la Convention\nCollective Nationale ÉCLAT.</p>\n\n\n<div style="border:1px solid #ddd;padding:1rem;margin:1.3rem 0;border-radius:6px;background:#fff7ec">\n<p style="margin:0;font-size:8.5pt"><strong>RGPD :</strong> Les données personnelles du salarié sont traitées sur base contractuelle (art. 6.1.b RGPD) pour la gestion du personnel et de la paie, et conservées le temps nécessaire à l\'exécution du contrat et aux obligations légales de l\'employeur.</p>\n</div>\n\n<p style="margin:1.5rem 0 .5rem">Fait en deux exemplaires originaux,</p>\n<p style="margin:0 0 1.5rem">À Janneyrias, le {{date_signature}}</p>\n\n<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.5rem;margin-top:1.5rem">\n  <div>\n    <p style="margin:0 0 .3rem"><strong>Le Salarié</strong></p>\n    <p style="font-size:8.5pt;color:#777;margin:0 0 2.5rem">Précédée de la mention manuscrite « lu et approuvé »</p>\n    <div style="border-bottom:1px solid #ccc;margin-bottom:.2rem"></div>\n    <p style="font-size:8pt;color:#777;margin:0">{{prenom}} {{nom}}</p>\n  </div>\n  <div>\n    <p style="margin:0 0 .3rem"><strong>L\'Organisateur</strong></p>\n    <p style="font-size:8.5pt;color:#777;margin:0 0 .3rem">{{asso_resp}}</p>\n    {{signature_president}}\n    <div style="border-bottom:1px solid #ccc;margin:.3rem 0 .2rem"></div>\n    <p style="font-size:8pt;color:#777;margin:0">Signature et cachet de l\'association</p>\n  </div>\n</div>\n\n</div>';
 
   function init(){refresh();}
 
