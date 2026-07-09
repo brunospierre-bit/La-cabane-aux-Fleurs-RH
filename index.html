@@ -2960,116 +2960,124 @@ var Contrats = (function(){
     var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=saved?saved.valeur:TPL_DEFAULT;
 
-    // Variables disponibles (insérables via boutons)
     var vars=[
-      {v:'{{nom}}',l:'Nom'},
-      {v:'{{prenom}}',l:'Prénom'},
-      {v:'{{date_naissance}}',l:'Date naissance'},
-      {v:'{{lieu_naissance}}',l:'Lieu naissance'},
-      {v:'{{adresse}}',l:'Adresse'},
-      {v:'{{nss}}',l:'N° SS'},
-      {v:'{{bafa_statut}}',l:'Statut BAFA'},
-      {v:'{{periode}}',l:'Période'},
-      {v:'{{nb_jours}}',l:'Nb jours accueil'},
-      {v:'{{nb_demi_journees}}',l:'Demi-journées'},
-      {v:'{{nb_reunion_prepa}}',l:'Réunions prépa'},
-      {v:'{{nb_jours_total}}',l:'Total jours équiv.'},
-      {v:'{{periode_essai}}',l:'Période d\'essai'},
-      {v:'{{date_signature}}',l:'Date signature'},
-      {v:'{{numero_contrat}}',l:'N° contrat'},
-      {v:'{{asso_nom}}',l:'Nom association'},
-      {v:'{{asso_adresse}}',l:'Adresse asso.'},
-      {v:'{{asso_siret}}',l:'SIRET'},
-      {v:'{{asso_resp}}',l:'Responsable'},
-      {v:'{{signature_president}}',l:'Signature président'},
-      {v:'{{tableau_jours}}',l:'Tableau des jours'},
+      {v:'{{nom}}',l:'Nom'},{v:'{{prenom}}',l:'Prénom'},
+      {v:'{{date_naissance}}',l:'Date naissance'},{v:'{{lieu_naissance}}',l:'Lieu naissance'},
+      {v:'{{adresse}}',l:'Adresse'},{v:'{{nss}}',l:'N° SS'},{v:'{{bafa_statut}}',l:'Statut BAFA'},
+      {v:'{{periode}}',l:'Période'},{v:'{{nb_jours}}',l:'Nb jours accueil'},
+      {v:'{{nb_demi_journees}}',l:'Demi-journées'},{v:'{{nb_reunion_prepa}}',l:'Réunions prépa'},
+      {v:'{{nb_jours_total}}',l:'Total jours'},{v:'{{periode_essai}}',l:"Période d'essai"},
+      {v:'{{date_signature}}',l:'Date signature'},{v:'{{numero_contrat}}',l:'N° contrat'},
+      {v:'{{asso_nom}}',l:'Nom asso.'},{v:'{{asso_adresse}}',l:'Adresse asso.'},
+      {v:'{{asso_siret}}',l:'SIRET'},{v:'{{asso_resp}}',l:'Responsable'},
+      {v:'{{signature_president}}',l:'Signature président'},{v:'{{tableau_jours}}',l:'Tableau des jours'},
     ];
+
+    // Variable qui contiendra la référence Quill — accessible depuis les boutons
+    var _quill = null;
+
+    // Fonction de sauvegarde — lit depuis _quill ou depuis le DOM
+    async function _doSaveTpl(){
+      var content;
+      if(_quill){
+        content = _quill.root.innerHTML;
+      } else {
+        var ed = document.getElementById('quill-ed');
+        content = ed ? ed.innerHTML : '';
+      }
+      // Nettoyer les balises vides Quill
+      content = content.replace(/<p><br\s*\/?><\/p>/gi, '<br>').trim();
+      if(!content){U.toast('Le modèle est vide','danger'); return;}
+      try{
+        await DB.put('templates',{id:'main',cle:'main',valeur:content});
+        console.log('[TPL] Modèle sauvegardé localement, taille:', content.length);
+        U.toast('Modèle sauvegardé — synchronisation…','success');
+        U.closeModal();
+        try{
+          await DB.saveToCloud();
+          U.toast('Modèle synchronisé en ligne \u2713','success');
+        } catch(e2){
+          U.toast('Sauvegardé localement — cliquez sur le bouton Sauvegarder pour synchroniser','warning');
+        }
+      } catch(e){
+        U.toast('Erreur sauvegarde : '+e.message,'danger');
+      }
+    }
 
     U.modal({
       title:'Éditeur du modèle de contrat',
       size:'xl',
       body:
-        '<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i>'+
-        'Éditeur de texte comme Word. Utilisez les boutons ci-dessous pour insérer les variables (nom du salarié, dates, etc.).</div>'+
+        '<div class="alert alert-info mb2" style="font-size:.82rem"><i class="ti ti-info-circle"></i>'+
+        ' Éditeur de texte comme Word. Cliquez sur une variable pour l\'insérer à la position du curseur.</div>'+
         '<div style="margin-bottom:.6rem">'+
-          '<div style="font-size:.72rem;font-weight:600;color:var(--text-m);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em">Variables à insérer</div>'+
-          '<div style="display:flex;flex-wrap:wrap;gap:.25rem">'+
-            vars.map(function(v){
-              return'<button class="btn btn-xs btn-outline tpl-var-btn" data-var="'+v.v+'" title="'+v.v+'">'+v.l+'</button>';
-            }).join('')+
+          '<div style="font-size:.72rem;font-weight:600;color:var(--text-m);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.05em">Insérer une variable</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:.25rem" id="tpl-vars-row">'+
+            vars.map(function(v){return'<button type="button" class="btn btn-xs btn-outline tpl-var-btn" data-var="'+v.v+'" title="'+v.v+'">'+U.esc(v.l)+'</button>';}).join('')+
           '</div>'+
         '</div>'+
-        '<div id="quill-editor-wrap">'+
-          '<div id="quill-ed"></div>'+
+        '<div id="quill-container" style="border-radius:var(--radius);overflow:hidden">'+
+          '<div id="quill-toolbar">'+
+            '<span class="ql-formats"><select class="ql-header"><option value="1">Titre 1</option><option value="2">Titre 2</option><option value="3">Titre 3</option><option selected></option></select></span>'+
+            '<span class="ql-formats"><button class="ql-bold"></button><button class="ql-italic"></button><button class="ql-underline"></button></span>'+
+            '<span class="ql-formats"><select class="ql-color"></select><select class="ql-background"></select></span>'+
+            '<span class="ql-formats"><select class="ql-align"></select></span>'+
+            '<span class="ql-formats"><button class="ql-list" value="ordered"></button><button class="ql-list" value="bullet"></button></span>'+
+            '<span class="ql-formats"><button class="ql-clean"></button></span>'+
+          '</div>'+
+          '<div id="quill-ed" style="min-height:320px;max-height:420px;overflow-y:auto;background:#fff;font-family:Arial,sans-serif;font-size:11pt"></div>'+
         '</div>',
       footer:
-        '<button class="btn btn-ghost" id="tpl-cancel">Annuler</button>'+
-        '<button class="btn btn-outline btn-sm" id="tpl-reset"><i class="ti ti-refresh"></i> Restaurer modèle par défaut</button>'+
-        '<button class="btn btn-primary" id="tpl-save"><i class="ti ti-device-floppy"></i> Sauvegarder</button>'
+        '<button type="button" class="btn btn-ghost" id="tpl-cancel">Annuler</button>'+
+        '<button type="button" class="btn btn-outline btn-sm" id="tpl-reset"><i class="ti ti-refresh"></i> Modèle par défaut</button>'+
+        '<button type="button" class="btn btn-primary" id="tpl-save"><i class="ti ti-device-floppy"></i> Sauvegarder</button>'
     });
 
-    // Initialiser Quill après que la modale soit dans le DOM
+    // Binder les boutons AVANT l'init Quill (au cas où Quill mettrait du temps)
+    document.getElementById('tpl-cancel').onclick = U.closeModal;
+
+    document.getElementById('tpl-save').onclick = function(){ _doSaveTpl(); };
+
+    document.getElementById('tpl-reset').onclick = async function(){
+      var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Votre modèle personnalisé sera remplacé par le modèle d\'origine.',ok:'Restaurer',danger:false});
+      if(!ok) return;
+      if(_quill){
+        var t=document.createElement('div'); t.innerHTML=TPL_DEFAULT;
+        _quill.root.innerHTML=t.innerHTML;
+      }
+    };
+
+    // Init Quill après rendu DOM
     setTimeout(function(){
       if(typeof Quill === 'undefined'){
         document.getElementById('quill-ed').innerHTML =
-          '<div class="alert alert-danger"><i class="ti ti-x"></i> Quill non chargé. Vérifiez votre connexion internet.</div>';
+          '<div class="alert alert-danger"><i class="ti ti-x"></i> Erreur : Quill non chargé. Vérifiez votre connexion internet et rechargez la page.</div>';
         return;
       }
 
-      var quill = new Quill('#quill-ed', {
+      _quill = new Quill('#quill-ed', {
         theme: 'snow',
-        modules:{
-          toolbar:[
-            [{header:[1,2,3,false]}],
-            ['bold','italic','underline'],
-            [{color:[]},{background:[]}],
-            [{align:[]}],
-            [{list:'ordered'},{list:'bullet'}],
-            ['clean']
-          ]
-        }
+        modules:{ toolbar:'#quill-toolbar' }
       });
 
-      // Charger le contenu existant dans Quill
-      // Quill ne comprend pas le HTML arbitraire directement — on passe par un div temporaire
+      // Charger le contenu dans Quill
       var tmp=document.createElement('div');
       tmp.innerHTML=tpl;
-      quill.root.innerHTML=tmp.innerHTML;
+      _quill.root.innerHTML=tmp.innerHTML;
+      _quill.history.clear(); // réinitialiser l'historique undo après chargement
 
-      // Insérer une variable à la position du curseur
+      // Binder les boutons variables
       document.querySelectorAll('.tpl-var-btn').forEach(function(btn){
         btn.onclick=function(){
-          var range=quill.getSelection(true);
-          quill.insertText(range?range.index:quill.getLength(), btn.dataset.var, 'user');
-          quill.setSelection((range?range.index:quill.getLength())+btn.dataset.var.length);
+          var range=_quill.getSelection(true);
+          var pos=range?range.index:_quill.getLength()-1;
+          _quill.insertText(pos, btn.dataset.var, 'user');
+          _quill.setSelection(pos+btn.dataset.var.length, 0);
+          _quill.focus();
         };
       });
 
-      // Restaurer le modèle par défaut
-      document.getElementById('tpl-reset').onclick=async function(){
-        var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Votre modèle personnalisé sera remplacé.',ok:'Restaurer',danger:false});
-        if(ok){
-          var t=document.createElement('div'); t.innerHTML=TPL_DEFAULT;
-          quill.root.innerHTML=t.innerHTML;
-        }
-      };
-
-      document.getElementById('tpl-cancel').onclick=U.closeModal;
-
-      document.getElementById('tpl-save').onclick=async function(){
-        // Récupérer le HTML produit par Quill (propre, sans pollution)
-        var content=quill.root.innerHTML;
-        // Nettoyer les balises vides laissées par Quill
-        content=content.replace(/<p><br><\/p>/g,'<br>').trim();
-        await DB.put('templates',{id:'main',cle:'main',valeur:content});
-        U.toast('Modèle sauvegardé — synchronisation…','success');
-        U.closeModal();
-        DB.saveToCloud()
-          .then(function(){U.toast('Modèle synchronisé en ligne \u2713','success');})
-          .catch(function(){U.toast('Sauvegardé localement — cliquez sur Sauvegarder pour synchroniser','warning');});
-      };
-
-    }, 100); // laisser 100ms au DOM pour rendre la modale
+    }, 150);
   }
 
 
