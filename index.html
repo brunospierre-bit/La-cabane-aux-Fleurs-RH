@@ -2745,6 +2745,8 @@ var Contrats = (function(){
     var allTpls=await DB.getAll('templates');
     var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=saved?saved.valeur:TPL_DEFAULT;
+    // Détecter si le modèle stocké est obsolète (ne contient pas les variables récentes)
+    var isOutdated = saved && saved.valeur && !saved.valeur.includes('{{signature_president}}');
 
     var vars=[
       {v:'{{nom}}',l:'Nom'},{v:'{{prenom}}',l:'Prénom'},
@@ -2759,19 +2761,12 @@ var Contrats = (function(){
       {v:'{{signature_president}}',l:'Signature président'},{v:'{{tableau_jours}}',l:'Tableau des jours'},
     ];
 
-    // Variable qui contiendra la référence Quill — accessible depuis les boutons
     var _quill = null;
 
-    // Fonction de sauvegarde — lit depuis _quill ou depuis le DOM
     async function _doSaveTpl(){
       var content;
-      if(_quill){
-        content = _quill.root.innerHTML;
-      } else {
-        var ed = document.getElementById('quill-ed');
-        content = ed ? ed.innerHTML : '';
-      }
-      // Nettoyer les balises vides Quill
+      if(_quill){ content = _quill.root.innerHTML; }
+      else { var ed = document.getElementById('quill-ed'); content = ed ? ed.innerHTML : ''; }
       content = content.replace(/<p><br\s*\/?><\/p>/gi, '<br>').trim();
       if(!content){U.toast('Le modèle est vide','danger'); return;}
       try{
@@ -2794,6 +2789,14 @@ var Contrats = (function(){
       title:'Éditeur du modèle de contrat',
       size:'xl',
       body:
+        (isOutdated ?
+          '<div class="alert alert-warning mb2" id="tpl-outdated-banner" style="align-items:center">'+
+            '<i class="ti ti-alert-triangle"></i>'+
+            '<div style="flex:1"><strong>Un nouveau modèle par défaut est disponible</strong> (contrat CEE complet avec signature président). '+
+            'Le modèle actuellement affiché est une ancienne version.</div>'+
+            '<button type="button" class="btn btn-sm btn-primary" id="btn-load-new-default" style="flex-shrink:0">Charger le nouveau modèle</button>'+
+          '</div>'
+        : '')+
         '<div class="alert alert-info mb2" style="font-size:.82rem"><i class="ti ti-info-circle"></i>'+
         ' Éditeur de texte comme Word. Cliquez sur une variable pour l\'insérer à la position du curseur.</div>'+
         '<div style="margin-bottom:.6rem">'+
@@ -2819,18 +2822,18 @@ var Contrats = (function(){
         '<button type="button" class="btn btn-primary" id="tpl-save"><i class="ti ti-device-floppy"></i> Sauvegarder</button>'
     });
 
-    // Binder les boutons AVANT l'init Quill (au cas où Quill mettrait du temps)
     document.getElementById('tpl-cancel').onclick = U.closeModal;
-
     document.getElementById('tpl-save').onclick = function(){ _doSaveTpl(); };
 
     document.getElementById('tpl-reset').onclick = async function(){
-      var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Votre modèle personnalisé sera remplacé par le modèle d\'origine.',ok:'Restaurer',danger:false});
+      var ok=await U.confirm({title:'Restaurer le modèle par défaut ?',body:'Le modèle CEE complet (avec signature président) remplacera le contenu actuel de l\'éditeur. Cliquez ensuite sur Sauvegarder pour valider.',ok:'Restaurer',danger:false});
       if(!ok) return;
       if(_quill){
         var t=document.createElement('div'); t.innerHTML=TPL_DEFAULT;
         _quill.root.innerHTML=t.innerHTML;
       }
+      var banner=document.getElementById('tpl-outdated-banner');
+      if(banner) banner.remove();
     };
 
     // Init Quill après rendu DOM
@@ -2846,13 +2849,11 @@ var Contrats = (function(){
         modules:{ toolbar:'#quill-toolbar' }
       });
 
-      // Charger le contenu dans Quill
       var tmp=document.createElement('div');
       tmp.innerHTML=tpl;
       _quill.root.innerHTML=tmp.innerHTML;
-      _quill.history.clear(); // réinitialiser l'historique undo après chargement
+      _quill.history.clear();
 
-      // Binder les boutons variables
       document.querySelectorAll('.tpl-var-btn').forEach(function(btn){
         btn.onclick=function(){
           var range=_quill.getSelection(true);
@@ -2862,6 +2863,18 @@ var Contrats = (function(){
           _quill.focus();
         };
       });
+
+      // Bouton du bandeau "Charger le nouveau modèle"
+      var btnLoadNew=document.getElementById('btn-load-new-default');
+      if(btnLoadNew){
+        btnLoadNew.onclick=function(){
+          var t=document.createElement('div'); t.innerHTML=TPL_DEFAULT;
+          _quill.root.innerHTML=t.innerHTML;
+          var banner=document.getElementById('tpl-outdated-banner');
+          if(banner) banner.remove();
+          U.toast('Nouveau modèle chargé — cliquez sur Sauvegarder pour l\'appliquer','success');
+        };
+      }
 
     }, 150);
   }
