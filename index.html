@@ -351,7 +351,7 @@ textarea.form-control{resize:vertical;min-height:80px}
       <div id="setup-err" class="alert alert-danger" style="display:none"></div>
       <button class="btn btn-primary btn-full" id="btn-setup"><i class="ti ti-lock"></i> Créer le mot de passe</button>
     </div>
-    <p class="lock-ver">v3.1 — build 2026-07-10-B — Supabase Cloud</p>
+    <p class="lock-ver">v3.1 — build 2026-07-10-C — Supabase Cloud</p>
   </div>
 </div>
 
@@ -534,7 +534,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 
     <!-- PAGE PARAMÉTRAGE -->
     <section id="page-parametrage" class="page-section">
-      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-B</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
+      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-C</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
       <div class="g2">
         <div class="card"><div class="card-header"><h2 class="card-title">Coûts</h2></div><div class="card-body">
           <div class="form-group"><label class="form-label">Coût journalier chargé (€)</label><input type="number" id="p-cj" class="form-control" value="80" min="0"/></div>
@@ -2466,6 +2466,7 @@ var Contrats = (function(){
         '<div class="ctr-num">'+U.esc(c.numero||'—')+'</div>'+
         '<div class="ctr-info"><div class="ctr-name">'+U.esc(c.salarie_nom||'—')+'</div><div class="ctr-period">'+U.fmtShort(c.date_debut)+' – '+U.fmtShort(c.date_fin)+' · '+(c.nb_jours||0)+' j.</div></div>'+
         '<div style="display:flex;gap:.2rem">'+
+          '<button class="icon-btn sm" data-cp="regen" data-cid="'+c.id+'" title="Régénérer avec le modèle actuel" style="color:var(--primary)"><i class="ti ti-refresh"></i></button>'+
           '<button class="icon-btn sm" data-cp="edit"  data-cid="'+c.id+'" title="Modifier"><i class="ti ti-pencil"></i></button>'+
           '<button class="icon-btn sm" data-cp="pdf"   data-cid="'+c.id+'" title="Export PDF"><i class="ti ti-file-type-pdf"></i></button>'+
           '<button class="icon-btn sm" data-cp="print" data-cid="'+c.id+'" title="Imprimer"><i class="ti ti-printer"></i></button>'+
@@ -2482,6 +2483,7 @@ var Contrats = (function(){
           if(btn.dataset.cp==='print')_print(cid);
           else if(btn.dataset.cp==='pdf')  _exportPdf(cid);
           else if(btn.dataset.cp==='edit') _edit(cid);
+          else if(btn.dataset.cp==='regen') _regenerate(cid);
           else if(btn.dataset.cp==='del')  _del(cid);
         } else {
           _showPreview(cid);
@@ -2649,18 +2651,21 @@ var Contrats = (function(){
       if(j)sel.push(j);
     });
     sel.sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+    var sign=(document.getElementById('cf-sign')||{}).value||U.today();
+    var num=await DB.nextNumContrat();
+    return await _renderContratHTML(sal, sel, sign, num);
+  }
+
+  // Rendu pur du contrat : aucune dépendance au DOM (réutilisable pour régénération)
+  async function _renderContratHTML(sal, sel, sign, num){
     var nj=sel.filter(function(j){return j._src==='j'&&j.type!=='reunion_prepa';}).length;
     var np=sel.filter(function(j){return j._src==='p'&&j.sous_type!=='demi_journee';}).length;
     var nd=sel.filter(function(j){return j._src==='p'&&j.sous_type==='demi_journee';}).length;
-    // Réunions de préparation : équivalent calculé selon la durée (4h=0.5j, 8h=1j)
     var reunions=sel.filter(function(j){return j._src==='j'&&j.type==='reunion_prepa';});
     var equivReunions=reunions.reduce(function(acc,r){return acc+calcEquivReunion(r.heure_debut,r.heure_fin);},0);
     var equivTotal=nj+np+nd*0.5+equivReunions;
-    // Période d'essai = arrondi sup de 2/10 des jours d'accueil (péri + extra seulement)
     var periodeEssai=nj>0?Math.ceil(nj*2/10):0;
     var debut=sel[0].date,fin=sel[sel.length-1].date;
-    var sign=(document.getElementById('cf-sign')||{}).value||U.today();
-    var num=await DB.nextNumContrat();
     var p={nom:await DB.getParam('p_nom',''),adr:await DB.getParam('p_adr',''),siret:await DB.getParam('p_siret',''),resp:await DB.getParam('p_resp','')};
     var tbl='<table style="width:100%;border-collapse:collapse;font-size:9pt"><thead><tr style="background:#f5f5f5"><th style="padding:.3rem .6rem;border:1px solid #ddd;text-align:left">Date</th><th style="padding:.3rem .6rem;border:1px solid #ddd;text-align:left">Type</th><th style="padding:.3rem .6rem;border:1px solid #ddd;text-align:left">Horaires</th><th style="padding:.3rem .6rem;border:1px solid #ddd;text-align:left">Note</th></tr></thead><tbody>'+
       sel.map(function(j){
@@ -2678,7 +2683,6 @@ var Contrats = (function(){
     var allTpls2=await DB.getAll('templates');
     var tplRaw=allTpls2.find(function(t){return t.cle==='main'||t.id==='main';});
     var tpl=tplRaw?tplRaw.valeur:TPL_DEFAULT;
-    // Récupérer la signature du président pour l'injecter dans le contrat
     var sigUrl=await DB.getParam('p_sig_url','');
     var sigHtml=sigUrl?('<div style="margin:.5rem 0"><img src="'+sigUrl+'" style="max-height:60px;max-width:160px;object-fit:contain" alt="Signature"/></div>'):'<div style="height:40px"></div>';
     var vars={'{{nom}}':sal.nom,'{{prenom}}':sal.prenom,'{{date_naissance}}':U.fmtDate(sal.date_naissance),'{{lieu_naissance}}':sal.lieu_naissance||'','{{adresse}}':sal.adresse||'','{{nss}}':sal.nss||'—','{{bafa_statut}}':U.BAFA_L[sal.bafa_statut]||'','{{periode}}':'du '+U.fmtDate(debut)+' au '+U.fmtDate(fin),'{{nb_jours}}':String(nj+np),'{{nb_demi_journees}}':String(nd),'{{nb_reunion_prepa}}':U.fmtNum(equivReunions,2),'{{nb_jours_total}}':U.fmtNum(equivTotal,2),'{{periode_essai}}':periodeEssai>0?(periodeEssai+' jour'+(periodeEssai>1?'s':'')):"Sans période d'essai",'{{tableau_jours}}':tbl,'{{date_signature}}':U.fmtDate(sign),'{{numero_contrat}}':num,'{{asso_nom}}':p.nom,'{{asso_adresse}}':p.adr,'{{asso_siret}}':p.siret,'{{asso_resp}}':p.resp,'{{signature_president}}':sigHtml};
@@ -2686,6 +2690,47 @@ var Contrats = (function(){
     Object.keys(vars).forEach(function(k){html=html.split(k).join(vars[k]);});
     return{html,num,sal,debut,fin,sign,nj,np,nd,equivReunions,equivTotal};
   }
+
+  // Régénérer un contrat existant avec le modèle ACTUEL (sans passer par le formulaire)
+  async function _regenerate(id){
+    var c=await DB.get('contrats',id);
+    if(!c){U.toast('Contrat introuvable','danger');return;}
+    var ok=await U.confirm({
+      title:'Régénérer ce contrat ?',
+      body:'Le contrat '+c.numero+' sera reconstruit avec le modèle de contrat ACTUEL (mise en forme et texte à jour), en conservant le même numéro, le même salarié et les mêmes journées. Le contenu affiché sera remplacé.',
+      ok:'Régénérer',
+      danger:false
+    });
+    if(!ok)return;
+    try{
+      var sal=await DB.get('salaries',c.salarie_id);
+      if(!sal){U.toast('Salarié introuvable — impossible de régénérer','danger');return;}
+      // Reconstruire allJ comme dans openCreation (journées + préparations)
+      var jours=await DB.getAll('journees');
+      var preps=await DB.getAll('preparations');
+      var allJ=jours.map(function(j){return Object.assign({},j,{_src:'j'});}).concat(preps.map(function(p){return Object.assign({},p,{type:'preparation',_src:'p'});}));
+      var journeesIds=c.journees_ids||[];
+      var sel=journeesIds.map(function(key){
+        var parts=key.split('_');
+        var jid=parseInt(parts[0]), src=parts[1];
+        return allJ.find(function(x){return x.id===jid&&x._src===src;});
+      }).filter(Boolean);
+      if(!sel.length){U.toast('Aucune journée retrouvée pour ce contrat — régénération impossible','danger');return;}
+      sel.sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+      // Conserver le même numéro et la même date de signature que le contrat original
+      var r=await _renderContratHTML(sal, sel, c.date_creation||U.today(), c.numero);
+      await DB.put('contrats',Object.assign({},c,{html:r.html,nb_jours:r.nj+r.np,nb_demi:r.nd}));
+      await DB.log('modification','Régénération contrat '+c.numero,sal.id);
+      U.toast('Contrat '+c.numero+' régénéré — synchronisation…','success');
+      try{ await DB.saveToCloud(); U.toast('Synchronisé en ligne ✓','success'); }
+      catch(e2){ U.toast('Régénéré localement — cliquez sur Sauvegarder pour synchroniser','warning'); }
+      await refresh();
+      _showPreview(id);
+    } catch(e){
+      U.toast('Erreur régénération : '+e.message,'danger');
+    }
+  }
+
 
   async function _print(id){
     var c=await DB.get('contrats',id);if(!c||!c.html){U.toast('Contrat introuvable','danger');return;}
