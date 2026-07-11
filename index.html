@@ -351,7 +351,7 @@ textarea.form-control{resize:vertical;min-height:80px}
       <div id="setup-err" class="alert alert-danger" style="display:none"></div>
       <button class="btn btn-primary btn-full" id="btn-setup"><i class="ti ti-lock"></i> Créer le mot de passe</button>
     </div>
-    <p class="lock-ver">v3.1 — build 2026-07-10-A — Supabase Cloud</p>
+    <p class="lock-ver">v3.1 — build 2026-07-10-B — Supabase Cloud</p>
   </div>
 </div>
 
@@ -534,7 +534,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 
     <!-- PAGE PARAMÉTRAGE -->
     <section id="page-parametrage" class="page-section">
-      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-A</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
+      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-B</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
       <div class="g2">
         <div class="card"><div class="card-header"><h2 class="card-title">Coûts</h2></div><div class="card-body">
           <div class="form-group"><label class="form-label">Coût journalier chargé (€)</label><input type="number" id="p-cj" class="form-control" value="80" min="0"/></div>
@@ -594,7 +594,15 @@ textarea.form-control{resize:vertical;min-height:80px}
           <hr class="divider"/>
           <button class="btn btn-danger btn-sm" id="btn-reset"><i class="ti ti-trash"></i> Réinitialiser</button>
         </div></div>
-      </div>
+
+        <div class="card" style="grid-column:1/-1">
+          <div class="card-header"><h2 class="card-title"><i class="ti ti-file-text"></i> Modèle de contrat</h2></div>
+          <div class="card-body">
+            <div id="tpl-diag" class="alert alert-info" style="flex-direction:column;align-items:flex-start;gap:.2rem"><i class="ti ti-loader"></i> Chargement…</div>
+            <button class="btn btn-danger btn-sm mt2" id="btn-force-default-tpl"><i class="ti ti-refresh"></i> Forcer le modèle CEE par défaut (remplace le modèle actuel)</button>
+          </div>
+        </div>
+        </div>
     </section>
 
   </main>
@@ -2880,7 +2888,7 @@ var Contrats = (function(){
   }
 
 
-  return{init,refresh,openCreation};
+  return{init,refresh,openCreation,getDefaultTemplate:function(){return TPL_DEFAULT;}};
 })();
 
 
@@ -3160,6 +3168,8 @@ var Param = (function(){
     document.getElementById('btn-chg-pwd').onclick=_changePwd;
     document.getElementById('btn-imp').onclick=_import;
     document.getElementById('btn-reset').onclick=_reset;
+    document.getElementById('btn-force-default-tpl').onclick=_forceDefaultTpl;
+    _showTplDiag();
     document.getElementById('btn-sb-save').onclick=_saveSupaConfig;
     document.getElementById('btn-sb-test').onclick=_testSupaConfig;
     // Boutons signature
@@ -3299,6 +3309,53 @@ var Param = (function(){
     await DB.resetAll();
     U.toast('Données réinitialisées — rechargement…','danger');
     setTimeout(function(){window.location.reload();},1500);
+  }
+
+  async function _showTplDiag(){
+    var box=document.getElementById('tpl-diag');
+    if(!box)return;
+    try{
+      var allTpls=await DB.getAll('templates');
+      var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
+      if(!saved||!saved.valeur){
+        box.innerHTML='<i class="ti ti-info-circle"></i> <strong>Aucun modèle personnalisé stocké</strong> — le modèle CEE par défaut est utilisé pour tous les contrats.';
+        box.className='alert alert-success';
+        return;
+      }
+      var hasSig=saved.valeur.includes('{{signature_president}}');
+      var hasCEE=saved.valeur.includes('Engagement Éducatif')||saved.valeur.includes('ENGAGEMENT ÉDUCATIF')||saved.valeur.includes('ARTICLE 1');
+      var taille=saved.valeur.length;
+      box.className='alert '+(hasSig?'alert-success':'alert-warning');
+      box.innerHTML=
+        '<div><i class="ti '+(hasSig?'ti-check':'ti-alert-triangle')+'"></i> <strong>Modèle actuellement stocké '+(hasSig?'(à jour)':'(ANCIEN — sans signature président)')+'</strong></div>'+
+        '<div class="text-xs" style="margin-top:.3rem">Taille : '+taille+' caractères — Contient signature président : '+(hasSig?'Oui ✓':'Non ✗')+' — Ressemble au contrat CEE : '+(hasCEE?'Oui':'Non');
+    } catch(e){
+      box.className='alert alert-danger';
+      box.innerHTML='<i class="ti ti-x"></i> Erreur lecture modèle : '+e.message;
+    }
+  }
+
+  async function _forceDefaultTpl(){
+    var ok=await U.confirm({
+      title:'Remplacer le modèle de contrat ?',
+      body:'Le modèle actuellement stocké (personnalisé ou ancien) sera définitivement remplacé par le modèle CEE par défaut avec signature président. Cette action synchronise immédiatement vers Supabase.',
+      ok:'Remplacer',
+      danger:true
+    });
+    if(!ok)return;
+    try{
+      await DB.put('templates',{id:'main',cle:'main',valeur:Contrats.getDefaultTemplate()});
+      U.toast('Modèle remplacé — synchronisation…','success');
+      try{
+        await DB.saveToCloud();
+        U.toast('Modèle CEE synchronisé en ligne ✓','success');
+      } catch(e2){
+        U.toast('Sauvegardé localement — cliquez sur le bouton Sauvegarder (header) pour synchroniser','warning');
+      }
+      await _showTplDiag();
+    } catch(e){
+      U.toast('Erreur : '+e.message,'danger');
+    }
   }
 
   return{init};
