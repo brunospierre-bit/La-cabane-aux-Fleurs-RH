@@ -351,7 +351,7 @@ textarea.form-control{resize:vertical;min-height:80px}
       <div id="setup-err" class="alert alert-danger" style="display:none"></div>
       <button class="btn btn-primary btn-full" id="btn-setup"><i class="ti ti-lock"></i> Créer le mot de passe</button>
     </div>
-    <p class="lock-ver">v3.1 — build 2026-07-10-C — Supabase Cloud</p>
+    <p class="lock-ver">v3.1 — build 2026-07-10-D — Supabase Cloud</p>
   </div>
 </div>
 
@@ -534,7 +534,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 
     <!-- PAGE PARAMÉTRAGE -->
     <section id="page-parametrage" class="page-section">
-      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-C</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
+      <div class="page-header"><h1 class="page-title">Paramétrage</h1><div class="page-actions"><span class="text-xs text-m" style="margin-right:.5rem">build 2026-07-10-D</span><button class="btn btn-primary" id="btn-save-p"><i class="ti ti-device-floppy"></i> Enregistrer</button></div></div>
       <div class="g2">
         <div class="card"><div class="card-header"><h2 class="card-title">Coûts</h2></div><div class="card-body">
           <div class="form-group"><label class="form-label">Coût journalier chargé (€)</label><input type="number" id="p-cj" class="form-control" value="80" min="0"/></div>
@@ -994,6 +994,25 @@ const DB = (function(){
     _write(); return Promise.resolve();
   }
 
+  // ── Modèle de contrat : lecture/écriture robuste avec dédoublonnage ──
+  // Gère la migration silencieuse d'anciennes entrées corrompues (sans id, issues d'un ancien bug)
+  function getMainTemplate(){
+    var arr=_state.templates||[];
+    var candidates=arr.filter(function(t){return t.cle==='main'||t.id==='main';});
+    if(!candidates.length) return null;
+    candidates.sort(function(a,b){return(a.updated_at||'').localeCompare(b.updated_at||'');});
+    return candidates[candidates.length-1]; // la plus récemment modifiée
+  }
+
+  function setMainTemplate(content){
+    if(!_state.templates) _state.templates=[];
+    // Retirer TOUTES les entrées correspondant à 'main' (y compris anciennes entrées corrompues sans id)
+    _state.templates=_state.templates.filter(function(t){return t.cle!=='main'&&t.id!=='main';});
+    // Ajouter une entrée unique et propre
+    _state.templates.push({id:'main',cle:'main',valeur:content,updated_at:new Date().toISOString()});
+    _write();
+  }
+
   function getParam(k,def){ var p=(_state.params||[]).find(function(r){return r.cle===k;}); return Promise.resolve(p?p.valeur:def); }
   function setParam(k,v){
     if(!_state.params)_state.params=[];
@@ -1077,6 +1096,7 @@ const DB = (function(){
   return{
     open,getAll,get,getByIndex,add,put,del,
     getParam,setParam,getConfig,saveConfig,
+    getMainTemplate,setMainTemplate,
     nextNumContrat,log,exportAll,importAll,resetAll,
     forceSave,saveToCloud,getSupaConfig,saveSupaConfig,
     uploadFile,deleteFile,
@@ -2680,8 +2700,7 @@ var Contrats = (function(){
       }).join('')+
       '<tr style="background:#f0f4ff;font-weight:bold"><td colspan="3" style="padding:.3rem .6rem;border:1px solid #ddd">Total</td><td style="padding:.3rem .6rem;border:1px solid #ddd">'+nj+' j. accueil + '+np+' j. prépa + '+nd+' demi-j.'+(equivReunions>0?' + '+U.fmtNum(equivReunions,2)+' j. réunion':'')+' = <strong>'+U.fmtNum(equivTotal,2)+' j. équivalent</strong></td></tr>'+
     '</tbody></table>';
-    var allTpls2=await DB.getAll('templates');
-    var tplRaw=allTpls2.find(function(t){return t.cle==='main'||t.id==='main';});
+    var tplRaw=DB.getMainTemplate();
     var tpl=tplRaw?tplRaw.valeur:TPL_DEFAULT;
     var sigUrl=await DB.getParam('p_sig_url','');
     var sigHtml=sigUrl?('<div style="margin:.5rem 0"><img src="'+sigUrl+'" style="max-height:60px;max-width:160px;object-fit:contain" alt="Signature"/></div>'):'<div style="height:40px"></div>';
@@ -2795,8 +2814,7 @@ var Contrats = (function(){
   }
 
   async function openEditTpl(){
-    var allTpls=await DB.getAll('templates');
-    var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
+    var saved=DB.getMainTemplate();
     var tpl=saved?saved.valeur:TPL_DEFAULT;
     // Détecter si le modèle stocké est obsolète (ne contient pas les variables récentes)
     var isOutdated = saved && saved.valeur && !saved.valeur.includes('{{signature_president}}');
@@ -2823,7 +2841,7 @@ var Contrats = (function(){
       content = content.replace(/<p><br\s*\/?><\/p>/gi, '<br>').trim();
       if(!content){U.toast('Le modèle est vide','danger'); return;}
       try{
-        await DB.put('templates',{id:'main',cle:'main',valeur:content});
+        DB.setMainTemplate(content);
         console.log('[TPL] Modèle sauvegardé localement, taille:', content.length);
         U.toast('Modèle sauvegardé — synchronisation…','success');
         U.closeModal();
@@ -3360,8 +3378,7 @@ var Param = (function(){
     var box=document.getElementById('tpl-diag');
     if(!box)return;
     try{
-      var allTpls=await DB.getAll('templates');
-      var saved=allTpls.find(function(t){return t.cle==='main'||t.id==='main';});
+      var saved=DB.getMainTemplate();
       if(!saved||!saved.valeur){
         box.innerHTML='<i class="ti ti-info-circle"></i> <strong>Aucun modèle personnalisé stocké</strong> — le modèle CEE par défaut est utilisé pour tous les contrats.';
         box.className='alert alert-success';
@@ -3389,7 +3406,7 @@ var Param = (function(){
     });
     if(!ok)return;
     try{
-      await DB.put('templates',{id:'main',cle:'main',valeur:Contrats.getDefaultTemplate()});
+      DB.setMainTemplate(Contrats.getDefaultTemplate());
       U.toast('Modèle remplacé — synchronisation…','success');
       try{
         await DB.saveToCloud();
