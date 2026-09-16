@@ -2812,10 +2812,15 @@ var Planning = (function(){
     existing.forEach(function(j){existSet[j.date+'|'+j.type]=true;});
     var nouveaux=dates.filter(function(d){return!existSet[d+'|'+type];});
     var doublons=dates.length-nouveaux.length;
+    var isSimple=isSimpleAssign(type);
+    var npEl=document.getElementById('jbc-np'),ngEl=document.getElementById('jbc-ng');
+    var np=!isSimple&&npEl?(parseInt(npEl.value)||0):0;
+    var ng=!isSimple&&ngEl?(parseInt(ngEl.value)||0):0;
     box.style.display='block';
     box.className='alert '+(nouveaux.length?'alert-info':'alert-warning');
     box.innerHTML='<div style="flex:1"><i class="ti ti-calculator"></i> <strong>'+nouveaux.length+'</strong> journée(s) vont être créées'+
       (doublons>0?' — <strong>'+doublons+'</strong> déjà existante(s) seront ignorée(s)':'')+
+      (!isSimple&&(np||ng)?' — <strong>'+np+'</strong> petits + <strong>'+ng+'</strong> grands par journée':'')+
       '<div style="max-height:140px;overflow-y:auto;margin-top:.5rem;font-size:.78rem;display:flex;flex-wrap:wrap;gap:.3rem">'+
       dates.map(function(d){var dup=existSet[d+'|'+type];return'<span class="badge '+(dup?'badge-neutral':'badge-'+(U.TYPE_BADGE_CLS[type]||'primary'))+'" style="'+(dup?'text-decoration:line-through':'')+'">'+U.fmtShort(d)+'</span>';}).join('')+
       '</div></div>';
@@ -2860,6 +2865,8 @@ var Planning = (function(){
           '<div class="form-group"><label class="form-label">Heure fin</label><input type="time" id="jbc-hf" class="form-control" value="18:30"/></div>'+
           '<div class="form-group" id="jbc-hfm-wrap" style="display:none"><label class="form-label">Heure fin de matinée</label><input type="time" id="jbc-hfm" class="form-control" value="12:00"/></div>'+
           '<div class="form-group" id="jbc-hdam-wrap" style="display:none"><label class="form-label">Heure début d\'après-midi</label><input type="time" id="jbc-hdam" class="form-control" value="13:30"/></div>'+
+          '<div class="form-group" id="jbc-np-wrap" style="display:none"><label class="form-label">Enfants Petits (3–5 ans) / jour</label><input type="number" id="jbc-np" class="form-control" min="0" value="0"/></div>'+
+          '<div class="form-group" id="jbc-ng-wrap" style="display:none"><label class="form-label">Enfants Grands (6–12 ans) / jour</label><input type="number" id="jbc-ng" class="form-control" min="0" value="0"/></div>'+
         '</div>'+
         '<div class="form-group"><label class="form-label">Jours de la semaine <span class="req">*</span></label>'+
         '<div style="display:flex;flex-wrap:wrap;gap:.6rem">'+DOWS.map(function(d){return'<label class="check-label"><input type="checkbox" class="jbc-dow" value="'+d.v+'"'+(d.v>=1&&d.v<=5?' checked':'')+'/> '+d.l+'</label>';}).join('')+'</div></div>'+
@@ -2899,10 +2906,13 @@ var Planning = (function(){
       var simpleW=document.getElementById('jbc-pers-simple');
       var accW=document.getElementById('jbc-pers-accueil');
       var hfmW=document.getElementById('jbc-hfm-wrap'),hdamW=document.getElementById('jbc-hdam-wrap');
+      var npW=document.getElementById('jbc-np-wrap'),ngW=document.getElementById('jbc-ng-wrap');
       if(simpleW)simpleW.style.display=isSimple?'':'none';
       if(accW)accW.style.display=isSimple?'none':'';
       if(hfmW)hfmW.style.display=isAdmin?'':'none';
       if(hdamW)hdamW.style.display=isAdmin?'':'none';
+      if(npW)npW.style.display=isSimple?'none':'';
+      if(ngW)ngW.style.display=isSimple?'none':'';
     }
 
     document.getElementById('jbc-anim-rows').insertAdjacentHTML('beforeend',jbcAnimRow());
@@ -2919,6 +2929,8 @@ var Planning = (function(){
 
     ['jbc-from','jbc-to','jbc-type'].forEach(function(id){document.getElementById(id).onchange=function(){_bulkToggleTypeUI();_bulkPreview();};});
     document.querySelectorAll('.jbc-dow').forEach(function(c){c.onchange=_bulkPreview;});
+    document.getElementById('jbc-np').oninput=_bulkPreview;
+    document.getElementById('jbc-ng').oninput=_bulkPreview;
     _bulkToggleTypeUI();
     _bulkPreview();
     document.getElementById('jbc-cancel').onclick=U.closeModal;
@@ -2942,6 +2954,8 @@ var Planning = (function(){
       var dates=_bulkComputeDates();
       if(!dates.length){U.toast('Aucune date ne correspond aux critères','danger');return;}
       var isSimple=isSimpleAssign(type);
+      var np=isSimple?0:(parseInt(document.getElementById('jbc-np').value)||0);
+      var ng=isSimple?0:(parseInt(document.getElementById('jbc-ng').value)||0);
       var rsel=document.getElementById('jbc-reunion-sel');
       var rids=isSimple&&rsel?Array.from(rsel.selectedOptions).map(function(o){return parseInt(o.value);}):[];
       var animAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-anim-rows .anim-row')).map(function(r){return{sid:parseInt(r.querySelector('.as-sel').value)||0,groupe:r.querySelector('.ag-sel').value};}).filter(function(x){return x.sid;});
@@ -2955,7 +2969,7 @@ var Planning = (function(){
       for(var d of dates){
         var key=d+'|'+type;
         if(existSet[key]){ignored++;continue;}
-        var jid=await DB.add('journees',{date:d,type:type,heure_debut:hd,heure_fin:hf,heure_fin_matin:hfm,heure_debut_apm:hdam,nb_petits:0,nb_grands:0,nb_enfants:0,commentaire:com,annee:parseInt(d.split('-')[0]),mois:parseInt(d.split('-')[1])});
+        var jid=await DB.add('journees',{date:d,type:type,heure_debut:hd,heure_fin:hf,heure_fin_matin:hfm,heure_debut_apm:hdam,nb_petits:np,nb_grands:ng,nb_enfants:np+ng,commentaire:com,annee:parseInt(d.split('-')[0]),mois:parseInt(d.split('-')[1])});
         existSet[key]=true;
         created++;
         if(isSimple){
@@ -3099,15 +3113,22 @@ var Tam = (function(){
   async function _computeExtrascolaire(zone,journees){
     var out=[];
     var extra=journees.filter(function(j){return j.type==='extrascolaire';});
-    var periods=VACANCES_SCOLAIRES.filter(function(v){return v.zone===zone;});
+    var todayStr=U.today();
+    // Une fiche est due pour CHAQUE période de vacances (Toussaint, Noël, Hiver, Pâques/Printemps,
+    // Été), pas seulement celles où des journées d'accueil ont déjà été saisies : l'alerte doit
+    // pouvoir prévenir 2 mois à l'avance, donc avant que ces journées n'existent. Seules les
+    // périodes déjà entièrement passées (rentrée révolue) sont exclues, pour ne pas encombrer
+    // l'agenda d'échéances historiques qui n'ont plus lieu d'être.
+    var periods=VACANCES_SCOLAIRES.filter(function(v){return v.zone===zone&&v.fin>=todayStr;});
     var statusAll=await DB.getAll('tam_status');
     var doneInitiales=statusAll.filter(function(r){return r.kind==='extrascolaire_initiale'&&r.fait&&r.date_fait;});
     periods.forEach(function(p){
-      // Échéances basées sur le premier jour d'accueil RÉELLEMENT créé sur la période (pas la
-      // date officielle du calendrier des vacances, qui tombe souvent un samedi non ouvré).
+      // Échéances basées sur le premier jour d'accueil RÉELLEMENT créé sur la période quand il
+      // existe déjà ; à défaut (période pas encore planifiée), sur la date officielle de début de
+      // la période (calendrier des vacances) afin que l'alerte existe bien en amont.
       var periodExtra=extra.filter(function(j){return j.date>=p.debut&&j.date<=p.fin;}).sort(function(a,b){return a.date.localeCompare(b.date);});
-      if(!periodExtra.length)return;
-      var premierAccueil=periodExtra[0].date;
+      var premierAccueil=periodExtra.length?periodExtra[0].date:p.debut;
+      var provisoire=!periodExtra.length;
       var slug=_slug(p.anneeScolaire)+'_'+_slug(p.nom);
       var keyInit='tam_extrascolaire_initiale_'+slug;
       var dueInit=_addMonths(premierAccueil,-2);
@@ -3124,7 +3145,7 @@ var Tam = (function(){
       out.push({
         key:keyInit,kind:'extrascolaire_initiale',
         titre:'TAM / SDJES — Fiche initiale extrascolaire à effectuer avant le '+U.fmtShort(dueInit),
-        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — 1er jour d\'accueil réel : '+U.fmtShort(premierAccueil)+' — validité 3 ans',
+        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — '+(provisoire?'1er jour officiel de la période (aucune journée d\'accueil créée pour l\'instant) : ':'1er jour d\'accueil réel : ')+U.fmtShort(premierAccueil)+' — validité 3 ans',
         echeance:dueInit,
         couvertePar:couvranteRec?couvranteRec.alert_key:null,
         couverture:couvranteRec?{titre:couvranteRec.titre,dateFait:couvranteRec.date_fait.split('T')[0],limite:_addMonths(couvranteRec.date_fait.split('T')[0],36)}:null
@@ -3133,7 +3154,7 @@ var Tam = (function(){
       out.push({
         key:'tam_extrascolaire_complementaire_'+slug,kind:'extrascolaire_complementaire',
         titre:'TAM / SDJES — Fiche complémentaire extrascolaire à effectuer avant le '+U.fmtShort(dueComp),
-        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — 1er jour d\'accueil réel : '+U.fmtShort(premierAccueil),
+        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — '+(provisoire?'1er jour officiel de la période (aucune journée d\'accueil créée pour l\'instant) : ':'1er jour d\'accueil réel : ')+U.fmtShort(premierAccueil),
         echeance:dueComp
       });
     });
