@@ -157,6 +157,9 @@ textarea.form-control{resize:vertical;min-height:80px}
 .badge-danger{background:var(--danger-l);color:var(--danger)}
 .badge-info{background:var(--info-l);color:var(--info)}
 .badge-neutral{background:var(--gray-100);color:var(--text-s)}
+.badge-purple{background:#EDE4FB;color:#6D28D9}
+.badge-pink{background:#FCE4EC;color:#BE185D}
+.badge-slate{background:#E5E7EB;color:#374151}
 
 /* ===== ALERTS ===== */
 .alert{padding:.7rem 1rem;border-radius:var(--radius);font-size:.875rem;display:flex;gap:.6rem;align-items:flex-start;border:1px solid transparent;margin-bottom:.5rem}
@@ -211,6 +214,23 @@ textarea.form-control{resize:vertical;min-height:80px}
 .day-num{font-size:.78rem;font-weight:500;width:24px;height:24px;display:flex;align-items:center;justify-content:center;margin-bottom:.2rem}
 .cal-ev{font-size:.65rem;padding:.12rem .3rem;border-radius:3px;margin-bottom:.18rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;cursor:pointer}
 .ev-peri{background:#FFE8D0;color:#C05510}.ev-extra{background:#E8F5D0;color:#3A7010}.ev-reun{background:#BFECFF;color:#0369A1}
+.ev-admin{background:#E5E7EB;color:#374151}.ev-bureau{background:#EDE4FB;color:#6D28D9}.ev-clement{background:#FCE4EC;color:#BE185D}
+.ev-tam{background:#FEF3C7;color:#92400E;font-weight:600}.ev-tam-done{background:var(--gray-100);color:var(--text-m);text-decoration:line-through;font-weight:500}
+.cal-legend{display:flex;flex-wrap:wrap;gap:.4rem .9rem;margin:.7rem 0 0;font-size:.72rem;color:var(--text-m)}
+.cal-legend-item{display:flex;align-items:center;gap:.35rem}
+.cal-legend-dot{width:10px;height:10px;border-radius:3px;display:inline-block;flex-shrink:0}
+/* ===== TAM / SDJES ===== */
+.tam-card{border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .9rem;margin-bottom:.5rem;display:flex;gap:.7rem;align-items:flex-start}
+.tam-card.tam-retard{background:var(--danger-l);border-color:#FCA5A5}
+.tam-card.tam-urgent{background:var(--warning-l);border-color:#FCD34D}
+.tam-card.tam-proche{background:#FFF9EE;border-color:#FDE68A}
+.tam-card.tam-avenir{background:var(--gray-50);border-color:var(--border)}
+.tam-card.tam-termine{background:var(--success-l);border-color:#6EE7B7;opacity:.75}
+.tam-card i.tam-ico{font-size:18px;margin-top:2px;flex-shrink:0}
+.tam-card .tam-body{flex:1;min-width:0}
+.tam-card .tam-title{font-weight:600;font-size:.85rem}
+.tam-card .tam-sub{font-size:.75rem;color:var(--text-m);margin-top:.1rem}
+.tam-card .tam-due{font-size:.72rem;margin-top:.25rem;font-weight:500}
 .cal-list-item{display:flex;align-items:center;gap:.875rem;padding:.8rem 1.25rem;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .1s}
 .cal-list-item:hover{background:var(--gray-50)}
 .cal-list-item:last-child{border-bottom:none}
@@ -305,6 +325,7 @@ textarea.form-control{resize:vertical;min-height:80px}
   .page-content{padding:1rem}
   .sal-grid{grid-template-columns:1fr}
   .filter-row{flex-direction:column;align-items:stretch}
+  .tam-card{flex-direction:column;align-items:stretch}
 }
 @media(max-width:480px){.stats-grid{grid-template-columns:1fr}}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99}
@@ -422,6 +443,10 @@ textarea.form-control{resize:vertical;min-height:80px}
         <div class="card-header"><h2 class="card-title"><i class="ti ti-alert-triangle"></i> Alertes</h2></div>
         <div class="card-body" id="dash-alerts"><div class="alert alert-info"><i class="ti ti-loader"></i> Chargement…</div></div>
       </div>
+      <div class="card mt4">
+        <div class="card-header"><h2 class="card-title"><i class="ti ti-clipboard-text"></i> Déclarations TAM / SDJES</h2><button class="btn btn-ghost btn-sm" id="btn-tam-hist"><i class="ti ti-history"></i> Historique</button></div>
+        <div class="card-body" id="dash-tam"><p class="text-m text-sm">Chargement…</p></div>
+      </div>
       <div class="g2 mt4">
         <div class="card"><div class="card-header"><h2 class="card-title"><i class="ti ti-calendar-event"></i> Prochaines journées</h2></div><div class="card-body" id="dash-next"><p class="text-m text-sm">Chargement…</p></div></div>
         <div class="card"><div class="card-header"><h2 class="card-title"><i class="ti ti-users"></i> Salariés récents</h2></div><div class="card-body" id="dash-sal"><p class="text-m text-sm">Chargement…</p></div></div>
@@ -440,6 +465,7 @@ textarea.form-control{resize:vertical;min-height:80px}
       <div class="filter-bar">
         <div class="filter-row">
           <div class="input-wrap" style="flex:2;min-width:180px"><i class="ico ti ti-search"></i><input type="search" id="sal-q" class="form-control" placeholder="Nom, prénom, email…"/></div>
+          <select id="sal-type" class="form-control" style="flex:1;min-width:150px"><option value="">— Type de salarié —</option><option value="animateur">Animateur</option><option value="technicien_restauration">Technicien de restauration</option></select>
           <select id="sal-bafa" class="form-control" style="flex:1;min-width:130px"><option value="">— BAFA —</option><option value="non_diplome">Non diplômé</option><option value="stagiaire">Stagiaire</option><option value="titulaire">Titulaire</option><option value="directeur">Directeur</option></select>
           <select id="sal-docs" class="form-control" style="flex:1;min-width:130px"><option value="">— Documents —</option><option value="ok">Complet</option><option value="miss">Incomplet</option><option value="exp">Expiré</option></select>
           <button class="btn btn-ghost btn-sm" id="sal-reset"><i class="ti ti-x"></i></button>
@@ -455,6 +481,8 @@ textarea.form-control{resize:vertical;min-height:80px}
         <div class="page-actions">
           <div class="btn-grp"><button class="btn btn-outline btn-sm active" id="view-month">Mois</button><button class="btn btn-outline btn-sm" id="view-list">Liste</button></div>
           <button class="btn btn-outline btn-sm" id="btn-vac"><i class="ti ti-calendar-plus"></i> Vacances scolaires</button>
+          <button class="btn btn-outline btn-sm" id="btn-bulk-j"><i class="ti ti-stack-2"></i> Création en masse</button>
+          <button class="btn btn-outline btn-sm" id="btn-bulk-del"><i class="ti ti-trash"></i> Suppression en masse</button>
           <button class="btn btn-primary" id="btn-new-j"><i class="ti ti-plus"></i> Nouvelle journée</button>
         </div>
       </div>
@@ -465,6 +493,7 @@ textarea.form-control{resize:vertical;min-height:80px}
         <button class="btn btn-ghost btn-sm" id="cal-today">Aujourd'hui</button>
       </div>
       <div class="cal-wrap" id="cal-view"></div>
+      <div class="cal-legend" id="cal-legend"></div>
     </section>
 
     <!-- PAGE CONTRATS -->
@@ -490,9 +519,10 @@ textarea.form-control{resize:vertical;min-height:80px}
       </div>
       <div class="filter-bar"><div class="filter-row">
         <select id="sv-sal" class="form-control"><option value="">— Tous les salariés —</option></select>
+        <select id="sv-saltype" class="form-control"><option value="">— Tous types de salarié —</option><option value="animateur">Animateur</option><option value="technicien_restauration">Technicien de restauration</option></select>
         <select id="sv-mois" class="form-control"><option value="">— Tous les mois —</option></select>
         <select id="sv-an" class="form-control"><option value="">— Toutes les années —</option></select>
-        <select id="sv-type" class="form-control"><option value="">— Tous types —</option><option value="periscolaire">Périscolaire</option><option value="extrascolaire">Extrascolaire</option><option value="preparation">Préparation / Réunion</option></select>
+        <select id="sv-type" class="form-control"><option value="">— Tous types —</option><option value="periscolaire">Périscolaire</option><option value="extrascolaire">Extrascolaire</option><option value="preparation">Préparation / Réunion</option><option value="administratif">Administratif</option><option value="reunion_bureau">Réunion bureau</option><option value="point_clement_bureau">Point Clément - Bureau</option></select>
       </div></div>
       <div class="card mt3"><div class="card-body p0"><div class="table-wrap" id="sv-table"></div></div><div class="card-footer" id="sv-totals"></div></div>
     </section>
@@ -717,7 +747,8 @@ const DB = (function(){
       preparations: _state.preparations ||[],
       contrats:     _state.contrats     ||[],
       templates:    _state.templates    ||[],
-      params:       _state.params       ||[]
+      params:       _state.params       ||[],
+      tam_status:   _state.tam_status   ||[]
       // journal exclu : croît sans limite, reste local uniquement
     };
   }
@@ -756,12 +787,12 @@ const DB = (function(){
   }
 
   // ── État en mémoire ───────────────────────────────────────────
-  var _state={salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]};
+  var _state={salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[],tam_status:[]};
   var _nextIds={};
   var _unsaved=false;
 
   function _initCounters(){
-    ['salaries','journees','affectations','preparations','contrats','journal'].forEach(function(s){
+    ['salaries','journees','affectations','preparations','contrats','journal','tam_status'].forEach(function(s){
       var max=(_state[s]||[]).reduce(function(m,r){return Math.max(m,r.id||0);},0);
       _nextIds[s]=max+1;
     });
@@ -828,7 +859,7 @@ const DB = (function(){
   async function open(){
     var local=await idbGet('state');
     if(local){
-      _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},local);
+      _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[],tam_status:[]},local);
       _initCounters();
     }
     setTimeout(function(){
@@ -862,7 +893,7 @@ const DB = (function(){
         if(localTpl&&localTpl.valeur&&(!cloudTpl||!cloudTpl.valeur||(localTpl.updated_at||(localTs||''))>=(cloudTpl.updated_at||''))){
           cloudData.templates=_state.templates;
         }
-        _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},cloudData);
+        _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[],tam_status:[]},cloudData);
         _initCounters();
         await idbSet('state',_state);
         await idbSet('state_ts',cloudTs);
@@ -1085,11 +1116,11 @@ const DB = (function(){
   async function exportAll(){ return Object.assign({},_state,{exported_at:new Date().toISOString(),version:'3.0-supabase'}); }
   async function importAll(json){
     var src=(json.data&&(Array.isArray(json.data.salaries)||Array.isArray(json.data.journees)))?json.data:json;
-    _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]},src);
+    _state=Object.assign({salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[],tam_status:[]},src);
     _initCounters(); await forceSave();
   }
   async function resetAll(){
-    _state={salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[]};
+    _state={salaries:[],journees:[],affectations:[],preparations:[],contrats:[],journal:[],templates:[],params:[],tam_status:[]};
     _nextIds={}; await forceSave();
   }
 
@@ -1100,7 +1131,7 @@ const DB = (function(){
     nextNumContrat,log,exportAll,importAll,resetAll,
     forceSave,saveToCloud,getSupaConfig,saveSupaConfig,
     uploadFile,deleteFile,
-    STORES:{SALARIES:'salaries',JOURNEES:'journees',AFFECTATIONS:'affectations',PREPARATIONS:'preparations',CONTRATS:'contrats',JOURNAL:'journal',TEMPLATES:'templates'}
+    STORES:{SALARIES:'salaries',JOURNEES:'journees',AFFECTATIONS:'affectations',PREPARATIONS:'preparations',CONTRATS:'contrats',JOURNAL:'journal',TEMPLATES:'templates',TAM_STATUS:'tam_status'}
   };
 })();
 
@@ -1109,7 +1140,16 @@ const DB = (function(){
 const U = (function(){
   var MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   var BAFA_L={non_diplome:'Non diplômé',stagiaire:'Stagiaire BAFA',titulaire:'Titulaire BAFA',directeur:'Directeur'};
-  var TYPE_L={periscolaire:'Périscolaire',extrascolaire:'Extrascolaire',reunion_prepa:'Réunion de préparation'};
+  var TYPE_L={periscolaire:'Périscolaire',extrascolaire:'Extrascolaire',reunion_prepa:'Réunion de préparation',administratif:'Administratif',reunion_bureau:'Réunion bureau',point_clement_bureau:'Point Clément - Bureau'};
+  // Types de journée qui ne sont pas des accueils de loisirs (pas d'enfants, pas de taux d'encadrement)
+  var TYPE_BUREAU=['administratif','reunion_bureau','point_clement_bureau'];
+  // Couleur de badge associée à chaque type de journée (cohérent avec les badges .ev-* du calendrier)
+  var TYPE_BADGE_CLS={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info',administratif:'slate',reunion_bureau:'purple',point_clement_bureau:'pink'};
+  var TYPE_EV_CLS={periscolaire:'peri',extrascolaire:'extra',reunion_prepa:'reun',administratif:'admin',reunion_bureau:'bureau',point_clement_bureau:'clement'};
+  function isTypeBureau(t){return TYPE_BUREAU.indexOf(t)!==-1;}
+  var SAL_TYPE_L={animateur:'Animateur',technicien_restauration:'Technicien de restauration'};
+  function salType(s){return(s&&s.type_salarie)||'animateur';} // rétrocompatibilité : absence de type = animateur
+  function isTechnicien(s){return salType(s)==='technicien_restauration';}
   var AV_COLORS=['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#4F46E5','#9333EA','#16A34A'];
 
   function fmtDate(s,opts){
@@ -1121,6 +1161,11 @@ const U = (function(){
     try{var d=new Date(s+'T00:00:00');return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric'});}catch(e){return s;}
   }
   function today(){return new Date().toISOString().split('T')[0];}
+  // Formate une Date en YYYY-MM-DD en heure LOCALE (contrairement à toISOString() qui convertit
+  // en UTC et peut donc décaler la date d'un jour pour les fuseaux horaires en avance sur UTC,
+  // comme Europe/Paris). À utiliser pour toute date calculée à partir de composants locaux
+  // (ex : boucle jour par jour sur un intervalle de dates).
+  function isoLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function curYear(){return new Date().getFullYear();}
   function curMonth(){return new Date().getMonth()+1;}
   function isPast(s){if(!s)return false;return new Date(s+'T00:00:00')<new Date();}
@@ -1153,6 +1198,21 @@ const U = (function(){
     }
     if(sal.bafa_statut&&sal.bafa_statut!=='non_diplome'&&!sal.doc_bafa)a.push({type:'miss',label:'BAFA'});
     return a;
+  }
+
+  // Règle de blocage création de contrat : animateurs uniquement, dossier complet requis
+  function animContractBlockers(sal){
+    if(!sal||salType(sal)!=='animateur')return[];
+    var manquants=[];
+    if(!sal.doc_nss)manquants.push('Copie carte SS');
+    if(!sal.doc_casier)manquants.push('Extrait de casier judiciaire n°3');
+    if(sal.bafa_statut==='titulaire'&&!sal.doc_bafa)manquants.push('Diplôme BAFA');
+    if(!sal.doc_rib)manquants.push('RIB');
+    if(!(sal.adresse&&sal.adresse.trim()))manquants.push('Adresse postale');
+    if(!(sal.email&&sal.email.trim()))manquants.push('E-mail');
+    if(!(sal.nss&&sal.nss.trim()))manquants.push('N° Sécurité Sociale');
+    if(!sal.date_naissance)manquants.push('Date de naissance');
+    return manquants;
   }
 
   function toast(msg,type,dur){
@@ -1272,7 +1332,7 @@ const U = (function(){
     return list.filter(function(s){return!s.archived;}).sort(function(a,b){return(a.nom+a.prenom).localeCompare(b.nom+b.prenom,'fr');});
   }
 
-  return{MOIS,BAFA_L,TYPE_L,fmtDate,fmtShort,today,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
+  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,salType,isTechnicien,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
 })();
 
 // ===== NAVIGATION / ROUTING =====
@@ -1557,7 +1617,7 @@ var Dashboard = (function(){
     var joursAVenir = jours.filter(function(j){return j.date>=today&&(j.type==='periscolaire'||j.type==='extrascolaire');}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,30);
     for(var j of joursAVenir){
       var affJ = affects.filter(function(a){return a.journee_id===j.id;});
-      var nbAnim = affJ.length;
+      var nbAnim = affJ.filter(function(a){return a.groupe!=='technicien';}).length;
       if(nbAnim===0){
         alertes.push('<div class="alert alert-danger" style="cursor:pointer" onclick="App.go(\'planning\')"><i class="ti ti-user-x"></i><span><strong>'+U.fmtShort(j.date)+'</strong> — '+U.TYPE_L[j.type]+' : <strong>aucun animateur affecté</strong></span></div>');
       } else {
@@ -1602,6 +1662,21 @@ var Dashboard = (function(){
       }
     }
 
+    // 5. Échéances TAM / SDJES (déclarations administratives) — logique dédiée (module Tam)
+    var tamList = typeof Tam!=='undefined' ? await Tam.computeAlertes() : [];
+    var tamActive = tamList.filter(function(a){return a.statut!=='termine';});
+    document.getElementById('dash-tam').innerHTML = tamActive.length
+      ? Tam.renderCards(tamActive)
+      : '<div class="alert alert-success"><i class="ti ti-check-circle"></i> Aucune échéance TAM / SDJES en cours.</div>';
+    var btnTamHist=document.getElementById('btn-tam-hist');
+    if(btnTamHist)btnTamHist.onclick=function(){Tam.openHistorique();};
+    // Les échéances à plus de 30 jours restent une information discrète (visible dans la section
+    // dédiée ci-dessus) et n'alimentent pas le compteur de notifications général.
+    tamActive.filter(function(a){return a.statut!=='avenir';}).forEach(function(a){
+      var cls=a.statut==='proche'?'warning':'danger';
+      alertes.push('<div class="alert alert-'+cls+'" style="cursor:pointer" onclick="App.go(\'dashboard\')"><i class="ti ti-clipboard-text"></i><span>'+U.esc(a.titre)+'</span></div>');
+    });
+
     // ── Affichage alertes ─────────────────────────────────────────
     document.getElementById('dash-alerts').innerHTML = alertes.length
       ? alertes.slice(0,12).join('')
@@ -1619,13 +1694,19 @@ var Dashboard = (function(){
     // ── Prochaines journées ───────────────────────────────────────
     var next=jours.filter(function(j){return j.date>=today;}).sort(function(a,b){return a.date.localeCompare(b.date);}).slice(0,5);
     document.getElementById('dash-next').innerHTML=next.length?next.map(function(j){
-      var cls={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info'}[j.type]||'neutral';
-      var nbA=affects.filter(function(a){return a.journee_id===j.id;}).length;
+      var cls=U.TYPE_BADGE_CLS[j.type]||'neutral';
+      var affJ2=affects.filter(function(a){return a.journee_id===j.id;});
+      var isSimpleJ=U.isTypeBureau(j.type)||j.type==='reunion_prepa';
+      var nbAnimJ=affJ2.filter(function(a){return a.groupe!=='technicien';}).length;
+      var nbTechJ=affJ2.filter(function(a){return a.groupe==='technicien';}).length;
+      var metaTxt=isSimpleJ
+        ? (nbAnimJ+' salarié'+(nbAnimJ>1?'s':'')+' affecté'+(nbAnimJ>1?'s':''))
+        : ((j.nb_enfants||0)+' enf. · '+nbAnimJ+' anim.'+(nbTechJ?' · '+nbTechJ+' tech.':''));
       return'<div style="display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--gray-100)">'+
         '<span class="badge badge-'+cls+'">'+U.TYPE_L[j.type]+'</span>'+
         '<span class="text-sm">'+U.fmtDate(j.date,{day:'2-digit',month:'short',year:'numeric'})+'</span>'+
-        '<span class="text-xs text-m" style="margin-left:auto">'+(j.nb_enfants||0)+' enf. · '+nbA+' anim.</span>'+
-        (nbA===0?'<span class="badge badge-danger"><i class="ti ti-alert-triangle"></i></span>':'')+
+        '<span class="text-xs text-m" style="margin-left:auto">'+metaTxt+'</span>'+
+        (!isSimpleJ&&nbAnimJ===0?'<span class="badge badge-danger"><i class="ti ti-alert-triangle"></i></span>':'')+
       '</div>';
     }).join(''):'<p class="text-m text-sm">Aucune journée planifiée</p>';
 
@@ -1665,8 +1746,10 @@ var Salaries = (function(){
     var q=(document.getElementById('sal-q')||{}).value||'';
     var bafa=(document.getElementById('sal-bafa')||{}).value||'';
     var docs=(document.getElementById('sal-docs')||{}).value||'';
+    var stype=(document.getElementById('sal-type')||{}).value||'';
     if(q){var ql=q.toLowerCase();f=f.filter(function(s){return(s.nom||'').toLowerCase().includes(ql)||(s.prenom||'').toLowerCase().includes(ql)||(s.email||'').toLowerCase().includes(ql);});}
     if(bafa)f=f.filter(function(s){return s.bafa_statut===bafa;});
+    if(stype)f=f.filter(function(s){return U.salType(s)===stype;});
     if(docs){f=f.filter(function(s){var a=U.docStatus(s);if(docs==='ok')return a.length===0;if(docs==='miss')return a.some(function(x){return x.type==='miss';});if(docs==='exp')return a.some(function(x){return x.type==='exp'||x.type==='soon';});return true;});}
 
     var grid=document.getElementById('sal-grid');
@@ -1681,6 +1764,7 @@ var Salaries = (function(){
       var dp=al.map(function(a){return'<span class="doc-pill '+(a.type==='miss'?'doc-miss':a.type==='exp'?'doc-exp':'doc-exp')+'"><i class="ti '+(a.type==='miss'?'ti-x':'ti-alert-triangle')+'"></i>'+a.label+'</span>';}).join('');
       var ok=['NSS','Casier','RIB'].filter(function(l){return!al.find(function(a){return a.label===l;});}).map(function(l){return'<span class="doc-pill doc-ok"><i class="ti ti-check"></i>'+l+'</span>';}).join('');
       var bafaBadge=s.bafa_statut?'<span class="badge badge-'+(s.bafa_statut==='titulaire'?'success':s.bafa_statut==='stagiaire'?'info':s.bafa_statut==='directeur'?'primary':'neutral')+'" style="font-size:.67rem">'+U.BAFA_L[s.bafa_statut]+'</span>':'';
+      var typeBadge='<span class="badge '+(U.isTechnicien(s)?'badge-warning':'badge-primary')+'" style="font-size:.67rem"><i class="ti '+(U.isTechnicien(s)?'ti-tools-kitchen-2':'ti-ball-basketball')+'"></i> '+U.SAL_TYPE_L[U.salType(s)]+'</span>';
       return'<div class="sal-card'+(s.archived?' archived':'')+'" data-id="'+s.id+'">'+
         '<div class="sal-actions">'+
           (!s.archived?'<button class="icon-btn sm" data-action="edit" data-id="'+s.id+'" title="Modifier"><i class="ti ti-pencil"></i></button><button class="icon-btn sm" data-action="arch" data-id="'+s.id+'" title="Archiver"><i class="ti ti-archive"></i></button>':'<button class="icon-btn sm" data-action="del" data-id="'+s.id+'" title="Supprimer"><i class="ti ti-trash"></i></button>')+
@@ -1689,7 +1773,7 @@ var Salaries = (function(){
         '<div><div class="sal-name">'+U.esc(s.prenom)+' '+U.esc(s.nom)+'</div><div class="sal-meta">'+U.esc(s.email||'—')+'</div><div class="sal-meta">'+U.esc(s.telephone||'—')+'</div></div>'+
         (al.length?'<span class="badge badge-danger" style="margin-left:auto">'+al.length+'</span>':'')+
         '</div>'+
-        '<div style="margin-top:.4rem">'+bafaBadge+'</div>'+
+        '<div style="margin-top:.4rem;display:flex;gap:.3rem;flex-wrap:wrap">'+typeBadge+bafaBadge+'</div>'+
         '<div class="doc-pills">'+ok+dp+'</div>'+
       '</div>';
     }).join('');
@@ -1723,10 +1807,12 @@ var Salaries = (function(){
     document.getElementById('sal-q').oninput=deb;
     document.getElementById('sal-bafa').onchange=refresh;
     document.getElementById('sal-docs').onchange=refresh;
+    var stEl=document.getElementById('sal-type');if(stEl)stEl.onchange=refresh;
     document.getElementById('sal-reset').onclick=function(){
       document.getElementById('sal-q').value='';
       document.getElementById('sal-bafa').value='';
       document.getElementById('sal-docs').value='';
+      if(stEl)stEl.value='';
       refresh();
     };
   }
@@ -1767,6 +1853,7 @@ var Salaries = (function(){
       '<div class="g2">'+
         '<div class="form-group"><label class="form-label">Prénom <span class="req">*</span></label><input type="text" id="sf-prenom" class="form-control" placeholder="Prénom"/></div>'+
         '<div class="form-group"><label class="form-label">Nom <span class="req">*</span></label><input type="text" id="sf-nom" class="form-control" placeholder="NOM"/></div>'+
+        '<div class="form-group"><label class="form-label">Type de salarié <span class="req">*</span></label><select id="sf-type" class="form-control"><option value="animateur">Animateur</option><option value="technicien_restauration">Technicien de restauration</option></select></div>'+
         '<div class="form-group"><label class="form-label">Date de naissance</label><input type="date" id="sf-naiss" class="form-control"/></div>'+
         '<div class="form-group"><label class="form-label">Lieu de naissance</label><input type="text" id="sf-lieu" class="form-control"/></div>'+
         '<div class="form-group"><label class="form-label">Email</label><input type="email" id="sf-email" class="form-control"/></div>'+
@@ -1995,6 +2082,7 @@ var Salaries = (function(){
     }
     set('sf-prenom',s.prenom);
     set('sf-nom',s.nom);
+    set('sf-type',U.salType(s));
     set('sf-naiss',s.date_naissance);
     set('sf-lieu',s.lieu_naissance);
     set('sf-email',s.email);
@@ -2020,8 +2108,11 @@ var Salaries = (function(){
   async function _save(id,existing){
     var prenom=_gv('sf-prenom'),nom=_gv('sf-nom');
     if(!prenom||!nom){U.toast('Prénom et nom obligatoires','danger');return;}
+    var newType=_gv('sf-type')||'animateur';
+    var oldType=existing?U.salType(existing):null;
     var data=Object.assign({},existing||{},{
       prenom:prenom,nom:nom.toUpperCase(),
+      type_salarie:newType,
       date_naissance:_gv('sf-naiss'),lieu_naissance:_gv('sf-lieu'),
       email:_gv('sf-email'),telephone:_gv('sf-tel'),adresse:_gv('sf-adr'),
       bafa_statut:_gv('sf-bafa'),bafa_validite:_gv('sf-bafa-d'),
@@ -2039,8 +2130,13 @@ var Salaries = (function(){
     data.docs_paie=_docsPendingExtra.docs_paie!==null?_docsPendingExtra.docs_paie:((existing&&existing.docs_paie)||[]);
     data.docs_fin=_docsPendingExtra.docs_fin!==null?_docsPendingExtra.docs_fin:((existing&&existing.docs_fin)||[]);
     try{
-      if(id){data.id=id;await DB.put('salaries',data);await DB.log('modification','Modif salarié '+prenom+' '+nom,id);U.toast('Salarié mis à jour','success');}
-      else{await DB.add('salaries',data);await DB.log('creation','Création salarié '+prenom+' '+nom);U.toast('Salarié créé','success');}
+      if(id){
+        data.id=id;await DB.put('salaries',data);
+        await DB.log('modification','Modif salarié '+prenom+' '+nom,id);
+        if(oldType&&oldType!==newType){await DB.log('modification','Changement de type : '+(U.SAL_TYPE_L[oldType]||oldType)+' → '+(U.SAL_TYPE_L[newType]||newType)+' — '+prenom+' '+nom,id);}
+        U.toast('Salarié mis à jour','success');
+      }
+      else{await DB.add('salaries',data);await DB.log('creation','Création salarié ('+(U.SAL_TYPE_L[newType]||newType)+') '+prenom+' '+nom);U.toast('Salarié créé','success');}
       _docsPending={};U.closeModal();refresh();Dashboard.refresh();
     }catch(e){console.error(e);U.toast('Erreur sauvegarde : '+e.message,'danger');}
   }
@@ -2083,24 +2179,72 @@ function calcEquivReunion(heure_debut, heure_fin) {
   return heures / 8; // 4h = 0.5, 8h = 1.0, proportionnel
 }
 
+// ============================================================
+// CALENDRIER CENTRALISÉ DES VACANCES SCOLAIRES (zones A / B / C)
+// ============================================================
+// Structure centralisée unique utilisée par l'import de vacances (Planning)
+// et par le moteur d'échéances TAM / SDJES (Tam). Ne pas dupliquer ces
+// dates ailleurs dans le code.
+// ⚠ Ces dates sont fournies à titre indicatif pour permettre le calcul des
+// échéances ; elles ne constituent pas une source officielle/réglementaire.
+// L'association reste responsable de leur vérification et de leur mise à
+// jour (aucune donnée n'est supprimée en les modifiant : il suffit d'éditer
+// ce tableau et de recharger l'application).
+// Champs : anneeScolaire ('AAAA-AAAA'), zone ('A'|'B'|'C'), nom, debut, fin (AAAA-MM-JJ)
+var VACANCES_SCOLAIRES=[
+  // ── 2024-2025 ──
+  {anneeScolaire:'2024-2025',zone:'A',nom:'Toussaint 2024',debut:'2024-10-19',fin:'2024-11-04'},
+  {anneeScolaire:'2024-2025',zone:'A',nom:'Noël 2024',debut:'2024-12-21',fin:'2025-01-06'},
+  {anneeScolaire:'2024-2025',zone:'A',nom:'Hiver 2025',debut:'2025-02-22',fin:'2025-03-10'},
+  {anneeScolaire:'2024-2025',zone:'A',nom:'Printemps 2025',debut:'2025-04-19',fin:'2025-05-05'},
+  {anneeScolaire:'2024-2025',zone:'A',nom:'Été 2025',debut:'2025-07-05',fin:'2025-09-01'},
+  {anneeScolaire:'2024-2025',zone:'B',nom:'Toussaint 2024',debut:'2024-10-19',fin:'2024-11-04'},
+  {anneeScolaire:'2024-2025',zone:'B',nom:'Noël 2024',debut:'2024-12-21',fin:'2025-01-06'},
+  {anneeScolaire:'2024-2025',zone:'B',nom:'Hiver 2025',debut:'2025-02-08',fin:'2025-02-24'},
+  {anneeScolaire:'2024-2025',zone:'B',nom:'Printemps 2025',debut:'2025-04-05',fin:'2025-04-22'},
+  {anneeScolaire:'2024-2025',zone:'B',nom:'Été 2025',debut:'2025-07-05',fin:'2025-09-01'},
+  {anneeScolaire:'2024-2025',zone:'C',nom:'Toussaint 2024',debut:'2024-10-19',fin:'2024-11-04'},
+  {anneeScolaire:'2024-2025',zone:'C',nom:'Noël 2024',debut:'2024-12-21',fin:'2025-01-06'},
+  {anneeScolaire:'2024-2025',zone:'C',nom:'Hiver 2025',debut:'2025-02-15',fin:'2025-03-03'},
+  {anneeScolaire:'2024-2025',zone:'C',nom:'Printemps 2025',debut:'2025-04-12',fin:'2025-04-28'},
+  {anneeScolaire:'2024-2025',zone:'C',nom:'Été 2025',debut:'2025-07-05',fin:'2025-09-01'},
+  // ── 2025-2026 ──
+  {anneeScolaire:'2025-2026',zone:'A',nom:'Toussaint 2025',debut:'2025-10-18',fin:'2025-11-03'},
+  {anneeScolaire:'2025-2026',zone:'A',nom:'Noël 2025',debut:'2025-12-20',fin:'2026-01-05'},
+  {anneeScolaire:'2025-2026',zone:'A',nom:'Hiver 2026',debut:'2026-02-07',fin:'2026-02-23'},
+  {anneeScolaire:'2025-2026',zone:'A',nom:'Printemps 2026',debut:'2026-04-04',fin:'2026-04-20'},
+  {anneeScolaire:'2025-2026',zone:'A',nom:'Été 2026',debut:'2026-07-04',fin:'2026-09-01'},
+  {anneeScolaire:'2025-2026',zone:'B',nom:'Toussaint 2025',debut:'2025-10-18',fin:'2025-11-03'},
+  {anneeScolaire:'2025-2026',zone:'B',nom:'Noël 2025',debut:'2025-12-20',fin:'2026-01-05'},
+  {anneeScolaire:'2025-2026',zone:'B',nom:'Hiver 2026',debut:'2026-02-14',fin:'2026-03-02'},
+  {anneeScolaire:'2025-2026',zone:'B',nom:'Printemps 2026',debut:'2026-04-11',fin:'2026-04-27'},
+  {anneeScolaire:'2025-2026',zone:'B',nom:'Été 2026',debut:'2026-07-04',fin:'2026-09-01'},
+  {anneeScolaire:'2025-2026',zone:'C',nom:'Toussaint 2025',debut:'2025-10-18',fin:'2025-11-03'},
+  {anneeScolaire:'2025-2026',zone:'C',nom:'Noël 2025',debut:'2025-12-20',fin:'2026-01-05'},
+  {anneeScolaire:'2025-2026',zone:'C',nom:'Hiver 2026',debut:'2026-02-21',fin:'2026-03-09'},
+  {anneeScolaire:'2025-2026',zone:'C',nom:'Printemps 2026',debut:'2026-04-18',fin:'2026-05-04'},
+  {anneeScolaire:'2025-2026',zone:'C',nom:'Été 2026',debut:'2026-07-04',fin:'2026-09-01'},
+  // ── 2026-2027 ──
+  {anneeScolaire:'2026-2027',zone:'A',nom:'Toussaint 2026',debut:'2026-10-17',fin:'2026-11-02'},
+  {anneeScolaire:'2026-2027',zone:'A',nom:'Noël 2026',debut:'2026-12-19',fin:'2027-01-04'},
+  {anneeScolaire:'2026-2027',zone:'A',nom:'Hiver 2027',debut:'2027-02-13',fin:'2027-03-01'},
+  {anneeScolaire:'2026-2027',zone:'A',nom:'Printemps 2027',debut:'2027-04-10',fin:'2027-04-26'},
+  {anneeScolaire:'2026-2027',zone:'A',nom:'Été 2027',debut:'2027-07-03',fin:'2027-09-01'},
+  {anneeScolaire:'2026-2027',zone:'B',nom:'Toussaint 2026',debut:'2026-10-17',fin:'2026-11-02'},
+  {anneeScolaire:'2026-2027',zone:'B',nom:'Noël 2026',debut:'2026-12-19',fin:'2027-01-04'},
+  {anneeScolaire:'2026-2027',zone:'B',nom:'Hiver 2027',debut:'2027-02-20',fin:'2027-03-08'},
+  {anneeScolaire:'2026-2027',zone:'B',nom:'Printemps 2027',debut:'2027-04-17',fin:'2027-05-03'},
+  {anneeScolaire:'2026-2027',zone:'B',nom:'Été 2027',debut:'2027-07-03',fin:'2027-09-01'},
+  {anneeScolaire:'2026-2027',zone:'C',nom:'Toussaint 2026',debut:'2026-10-17',fin:'2026-11-02'},
+  {anneeScolaire:'2026-2027',zone:'C',nom:'Noël 2026',debut:'2026-12-19',fin:'2027-01-04'},
+  {anneeScolaire:'2026-2027',zone:'C',nom:'Hiver 2027',debut:'2027-02-06',fin:'2027-02-22'},
+  {anneeScolaire:'2026-2027',zone:'C',nom:'Printemps 2027',debut:'2027-04-03',fin:'2027-04-19'},
+  {anneeScolaire:'2026-2027',zone:'C',nom:'Été 2027',debut:'2027-07-03',fin:'2027-09-01'}
+];
+
 var Planning = (function(){
   var _y=new Date().getFullYear(),_m=new Date().getMonth(),_view='month';
   var PARAMS={tp:8,tg:12};
-
-  var VAC=[
-    {z:'A',l:'Toussaint 2024',d:'2024-10-19',f:'2024-11-04'},{z:'A',l:'Noël 2024',d:'2024-12-21',f:'2025-01-06'},
-    {z:'A',l:'Hiver 2025',d:'2025-02-22',f:'2025-03-10'},{z:'A',l:'Printemps 2025',d:'2025-04-19',f:'2025-05-05'},
-    {z:'A',l:'Été 2025',d:'2025-07-05',f:'2025-09-01'},{z:'A',l:'Toussaint 2025',d:'2025-10-18',f:'2025-11-03'},
-    {z:'A',l:'Noël 2025',d:'2025-12-20',f:'2026-01-05'},
-    {z:'B',l:'Toussaint 2024',d:'2024-10-19',f:'2024-11-04'},{z:'B',l:'Noël 2024',d:'2024-12-21',f:'2025-01-06'},
-    {z:'B',l:'Hiver 2025',d:'2025-02-08',f:'2025-02-24'},{z:'B',l:'Printemps 2025',d:'2025-04-05',f:'2025-04-22'},
-    {z:'B',l:'Été 2025',d:'2025-07-05',f:'2025-09-01'},{z:'B',l:'Toussaint 2025',d:'2025-10-18',f:'2025-11-03'},
-    {z:'B',l:'Noël 2025',d:'2025-12-20',f:'2026-01-05'},
-    {z:'C',l:'Toussaint 2024',d:'2024-10-19',f:'2024-11-04'},{z:'C',l:'Noël 2024',d:'2024-12-21',f:'2025-01-06'},
-    {z:'C',l:'Hiver 2025',d:'2025-02-15',f:'2025-03-03'},{z:'C',l:'Printemps 2025',d:'2025-04-12',f:'2025-04-28'},
-    {z:'C',l:'Été 2025',d:'2025-07-05',f:'2025-09-01'},{z:'C',l:'Toussaint 2025',d:'2025-10-18',f:'2025-11-03'},
-    {z:'C',l:'Noël 2025',d:'2025-12-20',f:'2026-01-05'}
-  ];
 
   async function init(){
     PARAMS.tp=parseInt(await DB.getParam('p_tp',8));
@@ -2117,15 +2261,51 @@ var Planning = (function(){
     document.getElementById('view-list').onclick=function(){_view='list';this.classList.add('active');document.getElementById('view-month').classList.remove('active');render();};
     document.getElementById('btn-new-j').onclick=function(){openJournee(null);};
     document.getElementById('btn-vac').onclick=importVacances;
+    var btnBulk=document.getElementById('btn-bulk-j');
+    if(btnBulk)btnBulk.onclick=openBulkCreate;
+    var btnBulkDel=document.getElementById('btn-bulk-del');
+    if(btnBulkDel)btnBulkDel.onclick=openBulkDelete;
+    _renderLegend();
+  }
+
+  function _renderLegend(){
+    var el=document.getElementById('cal-legend');
+    if(!el)return;
+    var types=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'];
+    var html=types.map(function(t){
+      return'<span class="cal-legend-item"><span class="cal-legend-dot ev-'+U.TYPE_EV_CLS[t]+'"></span>'+U.TYPE_L[t]+'</span>';
+    }).join('');
+    html+='<span class="cal-legend-item"><span class="cal-legend-dot ev-tam"></span>Échéance TAM/SDJES</span>';
+    el.innerHTML=html;
   }
 
   async function refresh(){await render();}
+
+  // Échéances TAM/SDJES à faire figurer dans l'agenda comme un rappel pour le directeur (fiche
+  // unique périscolaire — création J-8j avant la rentrée et verrouillage au dernier jour d'école —,
+  // fiche complémentaire extrascolaire, fiche initiale extrascolaire) : affichées à la date
+  // d'échéance déjà calculée par le module Tam, sans horaire, sans lien avec une journée d'accueil
+  // réelle (pas d'enfants, pas de personnel, n'apparaît dans aucun export). Une fiche initiale déjà
+  // validée et couverte pendant 3 ans reste affichée mais marquée comme faite (barrée), pour garder
+  // trace de sa validité sans exiger d'action.
+  async function _tamCalEvents(){
+    if(typeof Tam==='undefined'||!Tam.computeAlertes)return[];
+    try{
+      var alerts=await Tam.computeAlertes();
+      return alerts.filter(function(a){
+        return a.kind==='periscolaire_unique'||a.kind==='extrascolaire_complementaire'||a.kind==='extrascolaire_initiale'||a.kind==='periscolaire_validation';
+      }).map(function(a){
+        return{date:a.echeance,type:'tam_rappel',_tam:true,tamKey:a.key,tamKind:a.kind,titre:a.titre,sousTitre:a.sousTitre,fait:!!a.fait};
+      });
+    }catch(e){return[];}
+  }
 
   async function render(){
     document.getElementById('cal-title').textContent=U.MOIS[_m]+' '+_y;
     var all=await DB.getAll('journees');
     var preps=await DB.getAll('preparations');
-    var combined=all.concat(preps.map(function(p){return Object.assign({},p,{type:'preparation',_prep:true});}));
+    var tamEvts=await _tamCalEvents();
+    var combined=all.concat(preps.map(function(p){return Object.assign({},p,{type:'preparation',_prep:true});})).concat(tamEvts);
     var filtered=combined.filter(function(j){
       if(!j.date)return false;
       var parts=j.date.split('-');
@@ -2155,7 +2335,12 @@ var Planning = (function(){
       html+='<div class="cal-day'+(ds===today?' today':'')+(evs.length?' has-ev':'')+'" data-date="'+ds+'">';
       html+='<div class="day-num">'+d+'</div>';
       evs.slice(0,2).forEach(function(e){
-        html+='<div class="cal-ev ev-'+(e.type==='periscolaire'?'peri':e.type==='reunion_prepa'?'reun':'extra')+'" data-jid="'+e.id+'" data-prep="'+(e._prep?1:0)+'">'+(e.type==='reunion_prepa'?'📝 Réunion':(e.heure_debut||''))+'</div>';
+        if(e._tam){
+          var tamLabel=e.tamKind==='periscolaire_unique'?'Fiche unique (TAM)':(e.tamKind==='extrascolaire_initiale'?'Fiche initiale (TAM)':(e.tamKind==='periscolaire_validation'?'Verrouillage fiche (TAM)':'Fiche compl. (TAM)'));
+          html+='<div class="cal-ev ev-tam'+(e.fait?' ev-tam-done':'')+'" data-tam="'+U.esc(e.tamKey)+'" title="'+U.esc(e.titre)+' — réservé au directeur, sans horaire">🔔 '+tamLabel+'</div>';
+          return;
+        }
+        html+='<div class="cal-ev ev-'+(U.TYPE_EV_CLS[e.type]||'extra')+'" data-jid="'+e.id+'" data-prep="'+(e._prep?1:0)+'">'+(e.type==='reunion_prepa'?'📝 Réunion':U.isTypeBureau(e.type)?U.esc(U.TYPE_L[e.type]):(e.heure_debut||''))+'</div>';
       });
       if(evs.length>2)html+='<div class="cal-ev" style="background:var(--gray-100);color:var(--text-m)">+' +(evs.length-2)+'</div>';
       html+='</div>';
@@ -2169,8 +2354,16 @@ var Planning = (function(){
   function _renderList(jevts){
     if(!jevts.length)return'<div class="empty" style="padding:2.5rem"><i class="ti ti-calendar"></i><p>Aucune journée ce mois-ci</p><button class="btn btn-primary" onclick="Planning.openJournee(null)" style="margin-top:.75rem"><i class="ti ti-plus"></i> Ajouter</button></div>';
     return jevts.map(function(j){
+      if(j._tam){
+        var td=new Date(j.date+'T00:00:00');
+        return'<div class="cal-list-item" data-tam="'+U.esc(j.tamKey)+'">'+
+          '<div class="cli-date"><div class="cli-day" style="color:#92400E">'+td.getDate()+'</div><div class="cli-month">'+U.MOIS[td.getMonth()].substring(0,3)+'</div></div>'+
+          '<div class="cli-info"><div class="cli-title"><span class="badge" style="background:#FEF3C7;color:#92400E">🔔 Échéance TAM/SDJES</span> '+U.esc(j.titre)+'</div>'+
+          '<div class="cli-meta">Réservé au directeur — sans horaire'+(j.fait?' · Fait':'')+'</div></div>'+
+        '</div>';
+      }
       var d=new Date(j.date+'T00:00:00');
-      var cls={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info'}[j.type]||'neutral';
+      var cls=U.TYPE_BADGE_CLS[j.type]||'neutral';
       return'<div class="cal-list-item" data-jid="'+j.id+'" data-prep="'+(j._prep?1:0)+'">'+'<div class="cli-date"><div class="cli-day" style="color:var(--'+(j.type==='periscolaire'?'primary':'success')+')">'+d.getDate()+'</div><div class="cli-month">'+U.MOIS[d.getMonth()].substring(0,3)+'</div></div>'+'<div class="cli-info"><div class="cli-title"><span class="badge badge-'+cls+'">'+U.TYPE_L[j.type]+'</span> '+U.esc(j.commentaire||'')+'</div><div class="cli-meta">'+(j.heure_debut&&j.heure_fin?j.heure_debut+' – '+j.heure_fin+' · ':'')+((j.nb_enfants||0)+' enfants')+'</div></div>'+'<div style="display:flex;gap:.25rem">'+'<button class="icon-btn sm" data-act="edit" data-jid="'+j.id+'" data-prep="'+(j._prep?1:0)+'"><i class="ti ti-pencil"></i></button>'+'<button class="icon-btn sm" data-act="del" data-jid="'+j.id+'" data-prep="'+(j._prep?1:0)+'"><i class="ti ti-trash"></i></button>'+'</div></div>';
     }).join('');
   }
@@ -2189,6 +2382,12 @@ var Planning = (function(){
         ev.dataset.prep==='1'?openPrep(id):openJournee(id);
       };
     });
+    cv.querySelectorAll('.cal-ev[data-tam]').forEach(function(ev){
+      ev.onclick=function(e){
+        e.stopPropagation();
+        _openTamInfo(ev.dataset.tam);
+      };
+    });
     cv.querySelectorAll('[data-act]').forEach(function(btn){
       btn.onclick=function(e){
         e.stopPropagation();
@@ -2198,13 +2397,52 @@ var Planning = (function(){
         else{isPrep?_delPrep(id):_delJournee(id);}
       };
     });
-    cv.querySelectorAll('.cal-list-item').forEach(function(item){
+    cv.querySelectorAll('.cal-list-item:not([data-tam])').forEach(function(item){
       item.onclick=function(e){
         if(e.target.closest('[data-act]'))return;
         var id=parseInt(item.dataset.jid);
         item.dataset.prep==='1'?openPrep(id):openJournee(id);
       };
     });
+    cv.querySelectorAll('.cal-list-item[data-tam]').forEach(function(item){
+      item.onclick=function(){_openTamInfo(item.dataset.tam);};
+    });
+  }
+
+  // Détail d'une échéance TAM/SDJES affichée dans l'agenda : rappel pour le directeur
+  // uniquement (ne modifie ni ne crée aucune journée d'accueil), avec bascule Fait/À faire
+  // réutilisant directement le module Tam (même source de vérité que le tableau de bord).
+  async function _openTamInfo(key){
+    if(typeof Tam==='undefined'||!Tam.computeAlertes)return;
+    var list=await Tam.computeAlertes();
+    var a=list.find(function(x){return x.key===key;});
+    if(!a){U.toast('Échéance introuvable (peut-être déjà mise à jour)','danger');return;}
+    // Couverte automatiquement par une fiche initiale validée ailleurs (validité 3 ans) : rien à
+    // faire ni à annuler ici, juste un rappel informatif de la couverture et de sa date limite.
+    var couvertureHtml=a.couverture?('<p class="text-m" style="font-size:.8rem;margin-bottom:.5rem"><i class="ti ti-shield-check"></i> Couverte par la fiche initiale validée le '+U.fmtShort(a.couverture.dateFait)+' (valable jusqu\'au '+U.fmtShort(a.couverture.limite)+').</p>'):'';
+    var footerBtn=a.fait?(a.auto?'':'<button class="btn btn-outline btn-sm" id="tam-info-undo"><i class="ti ti-arrow-back-up"></i> Annuler « fait »</button>'):'<button class="btn btn-primary" id="tam-info-done"><i class="ti ti-check"></i> Marquer comme fait</button>';
+    U.modal({
+      title:'Échéance TAM / SDJES',
+      body:'<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i> Rappel réservé au directeur — sans horaire, ne correspond à aucune journée d\'accueil.</div>'+
+        '<p style="font-weight:600;margin-bottom:.3rem">'+U.esc(a.titre)+'</p>'+
+        (a.sousTitre?'<p class="text-m" style="font-size:.85rem;margin-bottom:.5rem">'+U.esc(a.sousTitre)+'</p>':'')+
+        couvertureHtml+
+        '<p style="font-size:.85rem">Statut : <strong>'+(Tam.STATUT_L[a.statut]||a.statut)+'</strong></p>',
+      footer:'<button class="btn btn-ghost" id="tam-info-close">Fermer</button>'+footerBtn
+    });
+    document.getElementById('tam-info-close').onclick=U.closeModal;
+    var doneBtn=document.getElementById('tam-info-done');
+    if(doneBtn)doneBtn.onclick=async function(){
+      await Tam.marquerFait(a.key,a.titre,a.kind);
+      U.closeModal();await render();
+      if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    };
+    var undoBtn=document.getElementById('tam-info-undo');
+    if(undoBtn)undoBtn.onclick=async function(){
+      await Tam.annulerFait(a.key);
+      U.closeModal();await render();
+      if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    };
   }
 
   function _calcEnc(){
@@ -2231,11 +2469,18 @@ var Planning = (function(){
     '</div>';
   }
 
+  // Types de journée qui utilisent le mode d'affectation "simple" (liste de salariés présents,
+  // sans enfants ni taux d'encadrement) : réunion de préparation + journées de bureau.
+  function isSimpleAssign(t){return t==='reunion_prepa'||U.isTypeBureau(t);}
+
   async function openJournee(id,dateDefault){
     var j=id?await DB.get('journees',id):null;
     var affects=id?await DB.getByIndex('affectations','journee_id',id):[];
     var sals=await U.getActifs();
-    var animOpts=sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('');
+    var animSals=sals.filter(function(s){return!U.isTechnicien(s);});
+    var techSals=sals.filter(function(s){return U.isTechnicien(s);});
+    var animOpts=animSals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('');
+    var techOpts=techSals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('');
 
     function animRow(idx,a){
       return'<div class="anim-row" style="border:1px solid var(--border);border-radius:8px;padding:.65rem;margin-bottom:.4rem">'+
@@ -2252,52 +2497,83 @@ var Planning = (function(){
       '</div>';
     }
 
-    var initRows=affects.length?affects.map(function(a,i){return animRow(i,a);}).join(''):animRow(0,null);
+    function techRow(idx,a){
+      return'<div class="tech-row" style="border:1px solid var(--border);border-radius:8px;padding:.65rem;margin-bottom:.4rem">'+
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.4rem;align-items:end">'+
+          '<div><label class="form-label" style="font-size:.72rem">Technicien de restauration</label><select class="form-control form-control-sm ts-sel"><option value="">— Choisir —</option>'+techOpts+'</select></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Début</label><input type="time" class="form-control form-control-sm td-in" value="'+(a?a.heure_debut||'07:30':'07:30')+'"/></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Fin</label><input type="time" class="form-control form-control-sm tf-in" value="'+(a?a.heure_fin||'18:30':'18:30')+'"/></div>'+
+          '<div style="padding-top:1.3rem"><button type="button" class="icon-btn sm rm-tech"><i class="ti ti-x"></i></button></div>'+
+        '</div>'+
+        '<input type="text" class="form-control form-control-sm to-in" style="margin-top:.35rem" placeholder="Observations" value="'+(a?U.esc(a.observations||''):'')+'"/>'+
+      '</div>';
+    }
+
+    var animAffects=affects.filter(function(a){return a.groupe!=='technicien';});
+    var techAffects=affects.filter(function(a){return a.groupe==='technicien';});
+    var initRows=animAffects.length?animAffects.map(function(a,i){return animRow(i,a);}).join(''):animRow(0,null);
+    var techInitRows=techAffects.length?techAffects.map(function(a,i){return techRow(i,a);}).join(''):techRow(0,null);
+
+    var typeOptions=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){
+      var sel=(j?j.type===t:t==='extrascolaire')?' selected':'';
+      return'<option value="'+t+'"'+sel+'>'+U.TYPE_L[t]+'</option>';
+    }).join('');
 
     U.modal({
       title:j?'Journée du '+U.fmtDate(j.date):'Nouvelle journée',
       size:'lg',
       body:'<div class="tabs">'+
         '<button class="tab-btn active" data-tab="jinfo"><i class="ti ti-calendar"></i> Journée</button>'+
-        '<button class="tab-btn" data-tab="janim" id="janim-tab-btn"><i class="ti ti-users"></i> Animateurs</button>'+
+        '<button class="tab-btn" data-tab="janim" id="janim-tab-btn"><i class="ti ti-users"></i> Personnel</button>'+
       '</div>'+
       '<div class="tab-pane active" data-tab="jinfo">'+
         '<div class="g2">'+
           '<div class="form-group"><label class="form-label">Date <span class="req">*</span></label><input type="date" id="jf-date" class="form-control" value="'+(j?j.date:dateDefault||U.today())+'"/></div>'+
-          '<div class="form-group"><label class="form-label">Type <span class="req">*</span></label><select id="jf-type" class="form-control"><option value="periscolaire"'+(j&&j.type==='periscolaire'?' selected':'')+'>Périscolaire</option><option value="extrascolaire"'+((!j||j.type==='extrascolaire')?' selected':'')+'>Extrascolaire</option><option value="reunion_prepa"'+(j&&j.type==='reunion_prepa'?' selected':'')+'>Réunion de préparation</option></select></div>'+
+          '<div class="form-group"><label class="form-label">Type <span class="req">*</span></label><select id="jf-type" class="form-control">'+typeOptions+'</select></div>'+
           '<div class="form-group"><label class="form-label">Heure début</label><input type="time" id="jf-hd" class="form-control" value="'+(j?j.heure_debut||'07:30':'07:30')+'"/></div>'+
           '<div class="form-group"><label class="form-label">Heure fin</label><input type="time" id="jf-hf" class="form-control" value="'+(j?j.heure_fin||'18:30':'18:30')+'"/></div>'+
+          '<div class="form-group" id="jf-hfm-wrap" style="display:none"><label class="form-label">Heure fin de matinée</label><input type="time" id="jf-hfm" class="form-control" value="'+(j?j.heure_fin_matin||'12:00':'12:00')+'"/></div>'+
+          '<div class="form-group" id="jf-hdam-wrap" style="display:none"><label class="form-label">Heure début d\'après-midi</label><input type="time" id="jf-hdam" class="form-control" value="'+(j?j.heure_debut_apm||'13:30':'13:30')+'"/></div>'+
           '<div class="form-group" id="jf-np-wrap"><label class="form-label">Enfants Petits (3–5 ans)</label><input type="number" id="jf-np" class="form-control" min="0" value="'+(j?j.nb_petits||0:0)+'"/></div>'+
           '<div class="form-group" id="jf-ng-wrap"><label class="form-label">Enfants Grands (6–12 ans)</label><input type="number" id="jf-ng" class="form-control" min="0" value="'+(j?j.nb_grands||0:0)+'"/></div>'+
         '</div>'+
         '<div class="form-group"><label class="form-label">Commentaire</label><textarea id="jf-com" class="form-control" rows="2">'+(j?U.esc(j.commentaire||''):'')+'</textarea></div>'+
-        '<div id="jf-reunion-sals" class="form-group" style="display:none"><label class="form-label">Salariés présents à la réunion</label><select id="jf-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('')+'</select><p class="form-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés</p></div>'+
+        '<div id="jf-reunion-sals" class="form-group" style="display:none"><label class="form-label">Salariés affectés à cette journée</label><select id="jf-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés</p></div>'+
         '<div id="enc-live"></div>'+
       '</div>'+
       '<div class="tab-pane" data-tab="janim">'+
+        '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Animateurs</div>'+
         '<div id="anim-rows">'+initRows+'</div>'+
         '<button type="button" class="btn btn-outline btn-sm mt2" id="btn-add-anim"><i class="ti ti-plus"></i> Ajouter animateur</button>'+
         '<div id="enc-live2" class="mt2"></div>'+
+        '<hr class="divider"/>'+
+        '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Techniciens de restauration</div>'+
+        '<div id="tech-rows">'+techInitRows+'</div>'+
+        '<button type="button" class="btn btn-outline btn-sm mt2" id="btn-add-tech"><i class="ti ti-plus"></i> Ajouter technicien de restauration</button>'+
       '</div>',
       footer:'<button class="btn btn-ghost" id="jf-cancel">Annuler</button>'+(id?'<button class="btn btn-danger btn-sm" id="jf-del"><i class="ti ti-trash"></i></button>':'')+'<button class="btn btn-primary" id="jf-save"><i class="ti ti-device-floppy"></i> Enregistrer</button>'
     });
 
     U.initTabs(document.getElementById('modal-body'));
 
-    // Afficher/masquer enfants & animateurs selon le type de journée
+    // Afficher/masquer enfants & personnel selon le type de journée
     function _toggleTypeUI(){
       var t=document.getElementById('jf-type').value;
-      var isReunion=(t==='reunion_prepa');
+      var isSimple=isSimpleAssign(t);
       var npW=document.getElementById('jf-np-wrap'),ngW=document.getElementById('jf-ng-wrap');
       var animBtn=document.getElementById('janim-tab-btn');
       var reunW=document.getElementById('jf-reunion-sals');
-      if(npW)npW.style.display=isReunion?'none':'';
-      if(ngW)ngW.style.display=isReunion?'none':'';
-      if(animBtn)animBtn.style.display=isReunion?'none':'';
-      if(reunW)reunW.style.display=isReunion?'':'none';
+      var isAdmin=t==='administratif';
+      var hfmW=document.getElementById('jf-hfm-wrap'),hdamW=document.getElementById('jf-hdam-wrap');
+      if(npW)npW.style.display=isSimple?'none':'';
+      if(ngW)ngW.style.display=isSimple?'none':'';
+      if(animBtn)animBtn.style.display=isSimple?'none':'';
+      if(reunW)reunW.style.display=isSimple?'':'none';
+      if(hfmW)hfmW.style.display=isAdmin?'':'none';
+      if(hdamW)hdamW.style.display=isAdmin?'':'none';
       var encLive=document.getElementById('enc-live');
-      if(isReunion&&encLive)encLive.innerHTML='';
-      if(isReunion){
+      if(isSimple&&encLive)encLive.innerHTML='';
+      if(isSimple){
         var animPane=document.querySelector('.tab-pane[data-tab="janim"]');
         if(animPane&&animPane.classList.contains('active')){
           document.querySelector('.tab-btn[data-tab="jinfo"]').click();
@@ -2306,19 +2582,26 @@ var Planning = (function(){
     }
     document.getElementById('jf-type').onchange=function(){_toggleTypeUI();_calcEnc();};
     _toggleTypeUI();
-    // Pré-sélectionner les salariés déjà affectés si édition d'une réunion existante
-    if(j&&j.type==='reunion_prepa'&&affects.length){
+    // Pré-sélectionner les salariés déjà affectés si édition d'une journée en mode simple (réunion/bureau)
+    if(j&&isSimpleAssign(j.type)&&affects.length){
       var rsel=document.getElementById('jf-reunion-sel');
       if(rsel)affects.forEach(function(a){var opt=rsel.querySelector('option[value="'+a.salarie_id+'"]');if(opt)opt.selected=true;});
     }
 
     // Pré-remplir les selects animateurs
     var rows=document.querySelectorAll('#anim-rows .anim-row');
-    affects.forEach(function(a,i){
+    animAffects.forEach(function(a,i){
       var r=rows[i];if(!r)return;
       var ss=r.querySelector('.as-sel');var gs=r.querySelector('.ag-sel');
       if(ss&&a.salarie_id)ss.value=a.salarie_id;
       if(gs&&a.groupe)gs.value=a.groupe;
+    });
+    // Pré-remplir les selects techniciens
+    var trows=document.querySelectorAll('#tech-rows .tech-row');
+    techAffects.forEach(function(a,i){
+      var r=trows[i];if(!r)return;
+      var ts=r.querySelector('.ts-sel');
+      if(ts&&a.salarie_id)ts.value=a.salarie_id;
     });
 
     // Taux encadrement live
@@ -2333,7 +2616,14 @@ var Planning = (function(){
       ar.insertAdjacentHTML('beforeend',animRow(idx,null));
       _bindRemAnim();_bindAnimSel();
     };
-    _bindRemAnim();_bindAnimSel();
+    // Ajouter technicien
+    document.getElementById('btn-add-tech').onclick=function(){
+      var tr=document.getElementById('tech-rows');
+      var idx=tr.querySelectorAll('.tech-row').length;
+      tr.insertAdjacentHTML('beforeend',techRow(idx,null));
+      _bindRemTech();
+    };
+    _bindRemAnim();_bindAnimSel();_bindRemTech();
 
     document.getElementById('jf-cancel').onclick=U.closeModal;
     document.getElementById('jf-save').onclick=function(){_saveJournee(id,affects);};
@@ -2350,21 +2640,36 @@ var Planning = (function(){
   function _bindAnimSel(){
     document.querySelectorAll('#anim-rows .as-sel,.ag-sel').forEach(function(s){s.onchange=_calcEnc;});
   }
+  function _bindRemTech(){
+    document.querySelectorAll('#tech-rows .rm-tech').forEach(function(btn){
+      var nb=btn.cloneNode(true);btn.parentNode.replaceChild(nb,btn);
+      nb.onclick=function(){nb.closest('.tech-row').remove();};
+    });
+  }
 
   async function _saveJournee(id,oldAff){
     var date=document.getElementById('jf-date').value;
     var type=document.getElementById('jf-type').value;
     if(!date){U.toast('Date obligatoire','danger');return;}
-    var isReunion=(type==='reunion_prepa');
-    var np=isReunion?0:(parseInt(document.getElementById('jf-np').value)||0);
-    var ng=isReunion?0:(parseInt(document.getElementById('jf-ng').value)||0);
-    var data={date,type,heure_debut:document.getElementById('jf-hd').value,heure_fin:document.getElementById('jf-hf').value,nb_petits:np,nb_grands:ng,nb_enfants:np+ng,commentaire:document.getElementById('jf-com').value.trim(),annee:parseInt(date.split('-')[0]),mois:parseInt(date.split('-')[1])};
+    if(document.getElementById('jf-hd').value&&document.getElementById('jf-hf').value&&document.getElementById('jf-hf').value<=document.getElementById('jf-hd').value){
+      U.toast('L\'heure de fin doit être postérieure à l\'heure de début','danger');return;
+    }
+    var isAdmin=type==='administratif';
+    var hfm=isAdmin?(document.getElementById('jf-hfm').value||''):'';
+    var hdam=isAdmin?(document.getElementById('jf-hdam').value||''):'';
+    if(isAdmin&&hfm&&hdam&&hdam<=hfm){
+      U.toast('L\'heure de début d\'après-midi doit être postérieure à l\'heure de fin de matinée','danger');return;
+    }
+    var isSimple=isSimpleAssign(type);
+    var np=isSimple?0:(parseInt(document.getElementById('jf-np').value)||0);
+    var ng=isSimple?0:(parseInt(document.getElementById('jf-ng').value)||0);
+    var data={date,type,heure_debut:document.getElementById('jf-hd').value,heure_fin:document.getElementById('jf-hf').value,heure_fin_matin:hfm,heure_debut_apm:hdam,nb_petits:np,nb_grands:ng,nb_enfants:np+ng,commentaire:document.getElementById('jf-com').value.trim(),annee:parseInt(date.split('-')[0]),mois:parseInt(date.split('-')[1])};
     try{
       var jid=id;
       if(id){data.id=id;await DB.put('journees',data);}
       else{jid=await DB.add('journees',data);}
       for(var a of (oldAff||[]))await DB.del('affectations',a.id);
-      if(isReunion){
+      if(isSimple){
         var rsel=document.getElementById('jf-reunion-sel');
         var rids=rsel?Array.from(rsel.selectedOptions).map(function(o){return parseInt(o.value);}):[];
         for(var sid2 of rids){
@@ -2375,6 +2680,11 @@ var Planning = (function(){
         for(var r of rows){
           var sid=parseInt(r.querySelector('.as-sel').value);if(!sid)continue;
           await DB.add('affectations',{journee_id:jid,salarie_id:sid,groupe:r.querySelector('.ag-sel').value,heure_debut:r.querySelector('.ad-in').value,heure_fin:r.querySelector('.af-in').value,observations:r.querySelector('.ao-in').value,date});
+        }
+        var trows2=document.querySelectorAll('#tech-rows .tech-row');
+        for(var tr2 of trows2){
+          var tsid=parseInt(tr2.querySelector('.ts-sel').value);if(!tsid)continue;
+          await DB.add('affectations',{journee_id:jid,salarie_id:tsid,groupe:'technicien',heure_debut:tr2.querySelector('.td-in').value,heure_fin:tr2.querySelector('.tf-in').value,observations:tr2.querySelector('.to-in').value,date});
         }
       }
       U.toast(id?'Journée mise à jour':'Journée créée','success');
@@ -2434,13 +2744,13 @@ var Planning = (function(){
 
   async function importVacances(){
     var zone=await DB.getParam('p_zone','C');
-    var vacs=VAC.filter(function(v){return v.z===zone;});
+    var vacs=VACANCES_SCOLAIRES.filter(function(v){return v.zone===zone;});
     U.modal({
       title:'Import vacances Zone '+zone,
       size:'lg',
       body:'<div class="alert alert-info mb2"><i class="ti ti-calendar-plus"></i> Crée des journées extrascolaires (lun–ven) pour les périodes sélectionnées.</div>'+
         '<div style="border:1px solid var(--border);border-radius:8px;max-height:260px;overflow-y:auto;padding:.4rem">'+
-        vacs.map(function(v,i){return'<label class="check-label" style="padding:.35rem .5rem;border-bottom:1px solid var(--gray-100)"><input type="checkbox" class="vc" data-i="'+i+'" checked/> <strong>'+v.l+'</strong> — du '+U.fmtShort(v.d)+' au '+U.fmtShort(v.f)+'</label>';}).join('')+
+        vacs.map(function(v,i){return'<label class="check-label" style="padding:.35rem .5rem;border-bottom:1px solid var(--gray-100)"><input type="checkbox" class="vc" data-i="'+i+'" checked/> <strong>'+v.nom+'</strong> — du '+U.fmtShort(v.debut)+' au '+U.fmtShort(v.fin)+'</label>';}).join('')+
         '</div>',
       footer:'<button class="btn btn-ghost" id="vi-cancel">Annuler</button><button class="btn btn-primary" id="vi-ok"><i class="ti ti-download"></i> Importer</button>'
     });
@@ -2450,14 +2760,18 @@ var Planning = (function(){
       var total=0;
       for(var cb of checked){
         var v=vacs[parseInt(cb.dataset.i)];
-        var cur=new Date(v.d+'T00:00:00');var end=new Date(v.f+'T00:00:00');
-        while(cur<=end){
+        var cur=new Date(v.debut+'T00:00:00');var end=new Date(v.fin+'T00:00:00');
+        // NB : dans VACANCES_SCOLAIRES, "fin" est la date de rentrée (jour de reprise de la classe),
+        // pas un jour de vacances — convention officielle "du samedi 17/10 au lundi 02/11" où le
+        // lundi est déjà un jour d'école. Boucle donc strictement AVANT "fin" pour ne pas créer
+        // une journée d'accueil sur le jour de la rentrée.
+        while(cur<end){
           var dow=cur.getDay();
           if(dow!==0&&dow!==6){
-            var ds=cur.toISOString().split('T')[0];
+            var ds=U.isoLocal(cur);
             var ex=await DB.getAll('journees');
             if(!ex.find(function(j){return j.date===ds;})){
-              await DB.add('journees',{date:ds,type:'extrascolaire',heure_debut:'07:30',heure_fin:'18:30',nb_petits:0,nb_grands:0,nb_enfants:0,commentaire:v.l,annee:cur.getFullYear(),mois:cur.getMonth()+1});
+              await DB.add('journees',{date:ds,type:'extrascolaire',heure_debut:'07:30',heure_fin:'18:30',nb_petits:0,nb_grands:0,nb_enfants:0,commentaire:v.nom,annee:cur.getFullYear(),mois:cur.getMonth()+1});
               total++;
             }
           }
@@ -2468,7 +2782,521 @@ var Planning = (function(){
     };
   }
 
-  return{init,refresh,openJournee,openPrep};
+  // ===== CRÉATION EN MASSE DE JOURNÉES =====
+  // Réutilise le même modèle de données que la création classique (DB.add('journees', ...))
+  var DOWS=[{v:1,l:'Lundi'},{v:2,l:'Mardi'},{v:3,l:'Mercredi'},{v:4,l:'Jeudi'},{v:5,l:'Vendredi'},{v:6,l:'Samedi'},{v:0,l:'Dimanche'}];
+
+  function _bulkComputeDates(){
+    var from=(document.getElementById('jbc-from')||{}).value||'';
+    var to=(document.getElementById('jbc-to')||{}).value||'';
+    var days=Array.from(document.querySelectorAll('.jbc-dow:checked')).map(function(c){return parseInt(c.value);});
+    var out=[];
+    if(!from||!to||!days.length||to<from)return out;
+    var cur=new Date(from+'T00:00:00'),end=new Date(to+'T00:00:00');
+    var guard=0;
+    while(cur<=end&&guard<3660){
+      if(days.indexOf(cur.getDay())!==-1)out.push(U.isoLocal(cur));
+      cur.setDate(cur.getDate()+1);guard++;
+    }
+    return out;
+  }
+
+  async function _bulkPreview(){
+    var box=document.getElementById('jbc-recap');
+    if(!box)return;
+    var type=(document.getElementById('jbc-type')||{}).value||'';
+    var dates=_bulkComputeDates();
+    if(!dates.length){box.style.display='none';box.innerHTML='';return;}
+    var existing=await DB.getAll('journees');
+    var existSet={};
+    existing.forEach(function(j){existSet[j.date+'|'+j.type]=true;});
+    var nouveaux=dates.filter(function(d){return!existSet[d+'|'+type];});
+    var doublons=dates.length-nouveaux.length;
+    box.style.display='block';
+    box.className='alert '+(nouveaux.length?'alert-info':'alert-warning');
+    box.innerHTML='<div style="flex:1"><i class="ti ti-calculator"></i> <strong>'+nouveaux.length+'</strong> journée(s) vont être créées'+
+      (doublons>0?' — <strong>'+doublons+'</strong> déjà existante(s) seront ignorée(s)':'')+
+      '<div style="max-height:140px;overflow-y:auto;margin-top:.5rem;font-size:.78rem;display:flex;flex-wrap:wrap;gap:.3rem">'+
+      dates.map(function(d){var dup=existSet[d+'|'+type];return'<span class="badge '+(dup?'badge-neutral':'badge-'+(U.TYPE_BADGE_CLS[type]||'primary'))+'" style="'+(dup?'text-decoration:line-through':'')+'">'+U.fmtShort(d)+'</span>';}).join('')+
+      '</div></div>';
+  }
+
+  async function openBulkCreate(){
+    var sals=await U.getActifs();
+    var animSals=sals.filter(function(s){return!U.isTechnicien(s);});
+    var techSals=sals.filter(function(s){return U.isTechnicien(s);});
+    var animOpts=animSals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('');
+    var techOpts=techSals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+'</option>';}).join('');
+
+    function jbcAnimRow(){
+      return'<div class="anim-row" style="border:1px solid var(--border);border-radius:8px;padding:.5rem;margin-bottom:.35rem">'+
+        '<div style="display:grid;grid-template-columns:2fr 1fr auto;gap:.4rem;align-items:end">'+
+          '<div><label class="form-label" style="font-size:.72rem">Animateur</label><select class="form-control form-control-sm as-sel"><option value="">— Choisir —</option>'+animOpts+'</select></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Groupe</label><select class="form-control form-control-sm ag-sel"><option value="petits">Petits</option><option value="grands">Grands</option></select></div>'+
+          '<div style="padding-top:1.3rem"><button type="button" class="icon-btn sm rm-anim"><i class="ti ti-x"></i></button></div>'+
+        '</div>'+
+      '</div>';
+    }
+    function jbcTechRow(){
+      return'<div class="tech-row" style="border:1px solid var(--border);border-radius:8px;padding:.5rem;margin-bottom:.35rem">'+
+        '<div style="display:grid;grid-template-columns:2fr auto;gap:.4rem;align-items:end">'+
+          '<div><label class="form-label" style="font-size:.72rem">Technicien de restauration</label><select class="form-control form-control-sm ts-sel"><option value="">— Choisir —</option>'+techOpts+'</select></div>'+
+          '<div style="padding-top:1.3rem"><button type="button" class="icon-btn sm rm-tech"><i class="ti ti-x"></i></button></div>'+
+        '</div>'+
+      '</div>';
+    }
+
+    U.modal({
+      title:'Création en masse de journées',
+      size:'lg',
+      body:'<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i> Crée automatiquement une série de journées identiques (même modèle que la création classique). Les journées déjà existantes à une même date pour le même type ne sont pas dupliquées.</div>'+
+        '<div class="g2">'+
+          '<div class="form-group"><label class="form-label">Date début <span class="req">*</span></label><input type="date" id="jbc-from" class="form-control" value="'+U.today()+'"/></div>'+
+          '<div class="form-group"><label class="form-label">Date fin <span class="req">*</span></label><input type="date" id="jbc-to" class="form-control" value="'+U.today()+'"/></div>'+
+          '<div class="form-group"><label class="form-label">Type de journée <span class="req">*</span></label><select id="jbc-type" class="form-control">'+
+            ['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){return'<option value="'+t+'"'+(t==='periscolaire'?' selected':'')+'>'+U.TYPE_L[t]+'</option>';}).join('')+
+          '</select></div>'+
+          '<div class="form-group"><label class="form-label">Heure début</label><input type="time" id="jbc-hd" class="form-control" value="07:30"/></div>'+
+          '<div class="form-group"><label class="form-label">Heure fin</label><input type="time" id="jbc-hf" class="form-control" value="18:30"/></div>'+
+          '<div class="form-group" id="jbc-hfm-wrap" style="display:none"><label class="form-label">Heure fin de matinée</label><input type="time" id="jbc-hfm" class="form-control" value="12:00"/></div>'+
+          '<div class="form-group" id="jbc-hdam-wrap" style="display:none"><label class="form-label">Heure début d\'après-midi</label><input type="time" id="jbc-hdam" class="form-control" value="13:30"/></div>'+
+        '</div>'+
+        '<div class="form-group"><label class="form-label">Jours de la semaine <span class="req">*</span></label>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:.6rem">'+DOWS.map(function(d){return'<label class="check-label"><input type="checkbox" class="jbc-dow" value="'+d.v+'"'+(d.v>=1&&d.v<=5?' checked':'')+'/> '+d.l+'</label>';}).join('')+'</div></div>'+
+        '<div class="form-group"><label class="form-label">Commentaire</label><input type="text" id="jbc-com" class="form-control" placeholder="Optionnel"/></div>'+
+        '<hr class="divider"/>'+
+        '<div class="form-group" id="jbc-pers-simple" style="display:none"><label class="form-label">Salariés affectés</label><select id="jbc-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée</p></div>'+
+        '<div id="jbc-pers-accueil" style="display:none">'+
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Animateurs</div>'+
+          '<div id="jbc-anim-rows"></div>'+
+          '<button type="button" class="btn btn-outline btn-sm mt2" id="jbc-add-anim"><i class="ti ti-plus"></i> Ajouter animateur</button>'+
+          '<hr class="divider"/>'+
+          '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Techniciens de restauration</div>'+
+          '<div id="jbc-tech-rows"></div>'+
+          '<button type="button" class="btn btn-outline btn-sm mt2" id="jbc-add-tech"><i class="ti ti-plus"></i> Ajouter technicien de restauration</button>'+
+          '<p class="form-hint mt2">Affectés identiquement à chaque journée créée, avec les horaires définis ci-dessus.</p>'+
+        '</div>'+
+        '<div id="jbc-recap" class="alert alert-info" style="display:none"></div>',
+      footer:'<button class="btn btn-ghost" id="jbc-cancel">Annuler</button><button class="btn btn-primary" id="jbc-ok"><i class="ti ti-stack-2"></i> Créer les journées</button>'
+    });
+
+    function _bulkBindRemAnim(){
+      document.querySelectorAll('#jbc-anim-rows .rm-anim').forEach(function(btn){
+        var nb=btn.cloneNode(true);btn.parentNode.replaceChild(nb,btn);
+        nb.onclick=function(){nb.closest('.anim-row').remove();};
+      });
+    }
+    function _bulkBindRemTech(){
+      document.querySelectorAll('#jbc-tech-rows .rm-tech').forEach(function(btn){
+        var nb=btn.cloneNode(true);btn.parentNode.replaceChild(nb,btn);
+        nb.onclick=function(){nb.closest('.tech-row').remove();};
+      });
+    }
+    function _bulkToggleTypeUI(){
+      var t=document.getElementById('jbc-type').value;
+      var isSimple=isSimpleAssign(t);
+      var isAdmin=t==='administratif';
+      var simpleW=document.getElementById('jbc-pers-simple');
+      var accW=document.getElementById('jbc-pers-accueil');
+      var hfmW=document.getElementById('jbc-hfm-wrap'),hdamW=document.getElementById('jbc-hdam-wrap');
+      if(simpleW)simpleW.style.display=isSimple?'':'none';
+      if(accW)accW.style.display=isSimple?'none':'';
+      if(hfmW)hfmW.style.display=isAdmin?'':'none';
+      if(hdamW)hdamW.style.display=isAdmin?'':'none';
+    }
+
+    document.getElementById('jbc-anim-rows').insertAdjacentHTML('beforeend',jbcAnimRow());
+    document.getElementById('jbc-tech-rows').insertAdjacentHTML('beforeend',jbcTechRow());
+    _bulkBindRemAnim();_bulkBindRemTech();
+    document.getElementById('jbc-add-anim').onclick=function(){
+      document.getElementById('jbc-anim-rows').insertAdjacentHTML('beforeend',jbcAnimRow());
+      _bulkBindRemAnim();
+    };
+    document.getElementById('jbc-add-tech').onclick=function(){
+      document.getElementById('jbc-tech-rows').insertAdjacentHTML('beforeend',jbcTechRow());
+      _bulkBindRemTech();
+    };
+
+    ['jbc-from','jbc-to','jbc-type'].forEach(function(id){document.getElementById(id).onchange=function(){_bulkToggleTypeUI();_bulkPreview();};});
+    document.querySelectorAll('.jbc-dow').forEach(function(c){c.onchange=_bulkPreview;});
+    _bulkToggleTypeUI();
+    _bulkPreview();
+    document.getElementById('jbc-cancel').onclick=U.closeModal;
+    document.getElementById('jbc-ok').onclick=async function(){
+      var from=document.getElementById('jbc-from').value;
+      var to=document.getElementById('jbc-to').value;
+      var type=document.getElementById('jbc-type').value;
+      var hd=document.getElementById('jbc-hd').value;
+      var hf=document.getElementById('jbc-hf').value;
+      var com=document.getElementById('jbc-com').value.trim();
+      if(!from||!to){U.toast('Date de début et de fin obligatoires','danger');return;}
+      if(to<from){U.toast('La date de fin doit être postérieure ou égale à la date de début','danger');return;}
+      if(!type){U.toast('Type de journée obligatoire','danger');return;}
+      var days=Array.from(document.querySelectorAll('.jbc-dow:checked'));
+      if(!days.length){U.toast('Sélectionnez au moins un jour de la semaine','danger');return;}
+      if(hd&&hf&&hf<=hd){U.toast('L\'heure de fin doit être postérieure à l\'heure de début','danger');return;}
+      var isAdmin=type==='administratif';
+      var hfm=isAdmin?(document.getElementById('jbc-hfm').value||''):'';
+      var hdam=isAdmin?(document.getElementById('jbc-hdam').value||''):'';
+      if(isAdmin&&hfm&&hdam&&hdam<=hfm){U.toast('L\'heure de début d\'après-midi doit être postérieure à l\'heure de fin de matinée','danger');return;}
+      var dates=_bulkComputeDates();
+      if(!dates.length){U.toast('Aucune date ne correspond aux critères','danger');return;}
+      var isSimple=isSimpleAssign(type);
+      var rsel=document.getElementById('jbc-reunion-sel');
+      var rids=isSimple&&rsel?Array.from(rsel.selectedOptions).map(function(o){return parseInt(o.value);}):[];
+      var animAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-anim-rows .anim-row')).map(function(r){return{sid:parseInt(r.querySelector('.as-sel').value)||0,groupe:r.querySelector('.ag-sel').value};}).filter(function(x){return x.sid;});
+      var techAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-tech-rows .tech-row')).map(function(r){return parseInt(r.querySelector('.ts-sel').value)||0;}).filter(function(x){return x;});
+      var existing=await DB.getAll('journees');
+      var existSet={};
+      existing.forEach(function(j){existSet[j.date+'|'+j.type]=true;});
+      var created=0,ignored=0,affectCreated=0;
+      var btn=document.getElementById('jbc-ok');
+      btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Création…';
+      for(var d of dates){
+        var key=d+'|'+type;
+        if(existSet[key]){ignored++;continue;}
+        var jid=await DB.add('journees',{date:d,type:type,heure_debut:hd,heure_fin:hf,heure_fin_matin:hfm,heure_debut_apm:hdam,nb_petits:0,nb_grands:0,nb_enfants:0,commentaire:com,annee:parseInt(d.split('-')[0]),mois:parseInt(d.split('-')[1])});
+        existSet[key]=true;
+        created++;
+        if(isSimple){
+          for(var sid5 of rids){
+            await DB.add('affectations',{journee_id:jid,salarie_id:sid5,groupe:'',heure_debut:hd,heure_fin:hf,observations:'',date:d});
+            affectCreated++;
+          }
+        } else {
+          for(var ar2 of animAssigns){
+            await DB.add('affectations',{journee_id:jid,salarie_id:ar2.sid,groupe:ar2.groupe,heure_debut:hd,heure_fin:hf,observations:'',date:d});
+            affectCreated++;
+          }
+          for(var tsid3 of techAssigns){
+            await DB.add('affectations',{journee_id:jid,salarie_id:tsid3,groupe:'technicien',heure_debut:hd,heure_fin:hf,observations:'',date:d});
+            affectCreated++;
+          }
+        }
+      }
+      await DB.log('creation','Création en masse : '+created+' journée(s) '+U.TYPE_L[type]+' du '+U.fmtShort(from)+' au '+U.fmtShort(to)+(ignored?' ('+ignored+' déjà existante(s) ignorée(s))':'')+(affectCreated?' + '+affectCreated+' affectation(s)':''));
+      U.toast(created+' journée(s) créée(s)'+(affectCreated?' ('+affectCreated+' affectation(s))':'')+(ignored?' — '+ignored+' ignorée(s) (déjà existantes)':''),'success');
+      U.closeModal();await render();Dashboard.refresh();
+    };
+  }
+
+  // ===== SUPPRESSION EN MASSE DE JOURNÉES =====
+  // Liste filtrable (par type + plage de dates) avec sélection individuelle des journées à
+  // supprimer. Supprime aussi les affectations liées à chaque journée supprimée.
+  var BULK_DEL_TYPES=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'];
+
+  async function openBulkDelete(){
+    U.modal({
+      title:'Suppression en masse de journées',
+      size:'lg',
+      body:'<div class="alert alert-warning mb2"><i class="ti ti-alert-triangle"></i> Sélectionnez les journées à supprimer ci-dessous. Cette action supprime aussi leurs affectations et est irréversible.</div>'+
+        '<div class="g2">'+
+          '<div class="form-group"><label class="form-label">Type de journée</label><select id="jbd-type" class="form-control"><option value="">Tous les types</option>'+BULK_DEL_TYPES.map(function(t){return'<option value="'+t+'">'+U.TYPE_L[t]+'</option>';}).join('')+'</select></div>'+
+          '<div class="form-group"><label class="form-label">Date début</label><input type="date" id="jbd-from" class="form-control"/></div>'+
+          '<div class="form-group"><label class="form-label">Date fin</label><input type="date" id="jbd-to" class="form-control"/></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;flex-wrap:wrap;gap:.4rem">'+
+          '<div id="jbd-count" style="font-size:.8rem;color:var(--text-m)">—</div>'+
+          '<div><button type="button" class="btn btn-ghost btn-sm" id="jbd-all">Tout cocher</button><button type="button" class="btn btn-ghost btn-sm" id="jbd-none">Tout décocher</button></div>'+
+        '</div>'+
+        '<div id="jbd-list" style="border:1px solid var(--border);border-radius:8px;max-height:320px;overflow-y:auto;padding:.3rem"></div>',
+      footer:'<button class="btn btn-ghost" id="jbd-cancel">Annuler</button><button class="btn btn-danger" id="jbd-del"><i class="ti ti-trash"></i> Supprimer la sélection</button>'
+    });
+
+    function _updateCount(){
+      var total=document.querySelectorAll('.jbd-cb').length;
+      var checked=document.querySelectorAll('.jbd-cb:checked').length;
+      var box=document.getElementById('jbd-count');
+      if(box)box.textContent=checked+' / '+total+' journée(s) sélectionnée(s)';
+    }
+
+    async function _renderList(){
+      var type=document.getElementById('jbd-type').value;
+      var from=document.getElementById('jbd-from').value;
+      var to=document.getElementById('jbd-to').value;
+      var all=await DB.getAll('journees');
+      var filtered=all.filter(function(j){
+        if(type&&j.type!==type)return false;
+        if(from&&j.date<from)return false;
+        if(to&&j.date>to)return false;
+        return true;
+      }).sort(function(a,b){return a.date<b.date?-1:(a.date>b.date?1:0);});
+      var list=document.getElementById('jbd-list');
+      if(!list)return;
+      if(!filtered.length){
+        list.innerHTML='<p class="form-hint" style="padding:.5rem">Aucune journée ne correspond aux critères.</p>';
+      } else {
+        list.innerHTML=filtered.map(function(j){
+          return'<label class="check-label" style="display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-bottom:1px solid var(--gray-100)">'+
+            '<input type="checkbox" class="jbd-cb" value="'+j.id+'"/>'+
+            '<span class="badge badge-'+(U.TYPE_BADGE_CLS[j.type]||'primary')+'">'+U.TYPE_L[j.type]+'</span>'+
+            '<span>'+U.fmtShort(j.date)+'</span>'+
+            (j.commentaire?'<span style="color:var(--text-m);font-size:.78rem">'+U.esc(j.commentaire)+'</span>':'')+
+          '</label>';
+        }).join('');
+      }
+      _updateCount();
+    }
+
+    document.getElementById('jbd-type').onchange=_renderList;
+    document.getElementById('jbd-from').onchange=_renderList;
+    document.getElementById('jbd-to').onchange=_renderList;
+    document.getElementById('jbd-list').addEventListener('change',function(e){if(e.target.classList.contains('jbd-cb'))_updateCount();});
+    document.getElementById('jbd-all').onclick=function(){document.querySelectorAll('.jbd-cb').forEach(function(c){c.checked=true;});_updateCount();};
+    document.getElementById('jbd-none').onclick=function(){document.querySelectorAll('.jbd-cb').forEach(function(c){c.checked=false;});_updateCount();};
+    document.getElementById('jbd-cancel').onclick=U.closeModal;
+    document.getElementById('jbd-del').onclick=async function(){
+      var ids=Array.from(document.querySelectorAll('.jbd-cb:checked')).map(function(c){return parseInt(c.value);});
+      if(!ids.length){U.toast('Aucune journée sélectionnée','danger');return;}
+      var ok=await U.confirm({title:'Supprimer '+ids.length+' journée(s) ?',body:'Ces journées et leurs affectations seront définitivement supprimées. Cette action est irréversible.'});
+      if(!ok)return;
+      var btn=document.getElementById('jbd-del');
+      btn.disabled=true;btn.innerHTML='<i class="ti ti-loader"></i> Suppression…';
+      var count=0;
+      for(var id of ids){
+        var aff=await DB.getByIndex('affectations','journee_id',id);
+        for(var a of aff)await DB.del('affectations',a.id);
+        await DB.del('journees',id);
+        count++;
+      }
+      await DB.log('suppression','Suppression en masse : '+count+' journée(s) supprimée(s)');
+      U.toast(count+' journée(s) supprimée(s)','danger');
+      U.closeModal();await render();Dashboard.refresh();
+    };
+
+    await _renderList();
+  }
+
+  return{init,refresh,openJournee,openPrep,openBulkCreate,openBulkDelete};
+})();
+
+// ===== TAM / SDJES — Échéances de déclaration =====
+// Logique dédiée aux échéances administratives (déclarations TAM / SDJES).
+// Calculée automatiquement à partir : du calendrier centralisé VACANCES_SCOLAIRES
+// et des journées périscolaires/extrascolaires réellement créées (store 'journees').
+// Statuts persistés dans le store 'tam_status' (voir DB), indépendant du système
+// d'alertes RH existant (Dashboard) qu'il vient compléter, sans le remplacer.
+var Tam = (function(){
+  var STATUT_L={avenir:'À venir',proche:'Échéance proche',urgent:'Urgent',retard:'En retard',termine:'Terminé'};
+  var STATUT_ICO={avenir:'ti-calendar',proche:'ti-clock',urgent:'ti-alert-triangle',retard:'ti-alert-octagon',termine:'ti-circle-check'};
+
+  function _slug(s){
+    return(s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  }
+  function _addMonths(dateStr,n){var d=new Date(dateStr+'T00:00:00');d.setMonth(d.getMonth()+n);return U.isoLocal(d);}
+  function _addDays(dateStr,n){var d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);return U.isoLocal(d);}
+
+  // Statut selon la proximité de l'échéance (règles §11) :
+  // >30j = à venir (discret) ; ≤30j = proche ; ≤8j = urgent ; dépassée = en retard
+  function _statutEcheance(dueDate){
+    var diff=U.diffDays(U.today(),dueDate);
+    if(diff<0)return'retard';
+    if(diff<=8)return'urgent';
+    if(diff<=30)return'proche';
+    return'avenir';
+  }
+
+  async function _computeExtrascolaire(zone,journees){
+    var out=[];
+    var extra=journees.filter(function(j){return j.type==='extrascolaire';});
+    var periods=VACANCES_SCOLAIRES.filter(function(v){return v.zone===zone;});
+    var statusAll=await DB.getAll('tam_status');
+    var doneInitiales=statusAll.filter(function(r){return r.kind==='extrascolaire_initiale'&&r.fait&&r.date_fait;});
+    periods.forEach(function(p){
+      // Échéances basées sur le premier jour d'accueil RÉELLEMENT créé sur la période (pas la
+      // date officielle du calendrier des vacances, qui tombe souvent un samedi non ouvré).
+      var periodExtra=extra.filter(function(j){return j.date>=p.debut&&j.date<=p.fin;}).sort(function(a,b){return a.date.localeCompare(b.date);});
+      if(!periodExtra.length)return;
+      var premierAccueil=periodExtra[0].date;
+      var slug=_slug(p.anneeScolaire)+'_'+_slug(p.nom);
+      var keyInit='tam_extrascolaire_initiale_'+slug;
+      var dueInit=_addMonths(premierAccueil,-2);
+      // Validité 3 ans : une fiche initiale déjà validée (sur cette période ou une autre) couvre
+      // toute période dont le 1er jour d'accueil réel tombe dans les 3 ans suivant sa validation.
+      // La date de validation est conservée (date_fait, store tam_status) : une fois les 3 ans
+      // écoulés, plus aucune période ne tombe dans la fenêtre et une alerte réapparaît naturellement.
+      var couvranteRec=doneInitiales.find(function(d){
+        if(d.alert_key===keyInit)return false;
+        var dateFaitJour=d.date_fait.split('T')[0];
+        var limite=_addMonths(dateFaitJour,36);
+        return dateFaitJour<=premierAccueil&&limite>=premierAccueil;
+      });
+      out.push({
+        key:keyInit,kind:'extrascolaire_initiale',
+        titre:'TAM / SDJES — Fiche initiale extrascolaire à effectuer avant le '+U.fmtShort(dueInit),
+        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — 1er jour d\'accueil réel : '+U.fmtShort(premierAccueil)+' — validité 3 ans',
+        echeance:dueInit,
+        couvertePar:couvranteRec?couvranteRec.alert_key:null,
+        couverture:couvranteRec?{titre:couvranteRec.titre,dateFait:couvranteRec.date_fait.split('T')[0],limite:_addMonths(couvranteRec.date_fait.split('T')[0],36)}:null
+      });
+      var dueComp=_addDays(premierAccueil,-8);
+      out.push({
+        key:'tam_extrascolaire_complementaire_'+slug,kind:'extrascolaire_complementaire',
+        titre:'TAM / SDJES — Fiche complémentaire extrascolaire à effectuer avant le '+U.fmtShort(dueComp),
+        sousTitre:'Période concernée : '+p.nom+' (zone '+zone+') — 1er jour d\'accueil réel : '+U.fmtShort(premierAccueil),
+        echeance:dueComp
+      });
+    });
+    return out;
+  }
+
+  async function _computePeriscolaire(journees){
+    var out=[];
+    var peri=journees.filter(function(j){return j.type==='periscolaire';});
+    if(!peri.length)return out;
+    var todayD=new Date(U.today()+'T00:00:00');
+    var y=todayD.getMonth()>=7?todayD.getFullYear():todayD.getFullYear()-1; // année scolaire en cours
+    var anneeScolaire=y+'-'+(y+1);
+    var prevAnneeScolaire=(y-1)+'-'+y;
+
+    // 1. Fiche unique (création) : doit être établie 8 jours avant la rentrée scolaire de
+    // septembre. La rentrée = date de fin des vacances d'été précédentes (calendrier officiel —
+    // le 1er mercredi réel d'accueil ne peut pas servir de référence puisqu'il n'existe pas
+    // encore avant la rentrée elle-même, ce qui empêcherait toute alerte préventive).
+    var eteAvantRentree=VACANCES_SCOLAIRES.find(function(v){return v.anneeScolaire===prevAnneeScolaire&&v.nom.indexOf('Été')===0;});
+    if(eteAvantRentree){
+      var rentree=eteAvantRentree.fin;
+      var dueUnique=_addDays(rentree,-8);
+      var sept=peri.filter(function(j){
+        var d=new Date(j.date+'T00:00:00');
+        return d.getFullYear()===y&&d.getMonth()===8&&d.getDay()===3; // septembre (mois idx 8), mercredi
+      }).sort(function(a,b){return a.date.localeCompare(b.date);});
+      out.push({
+        key:'tam_periscolaire_unique_'+_slug(anneeScolaire),kind:'periscolaire_unique',
+        titre:'TAM / SDJES — Fiche unique périscolaire à effectuer avant le '+U.fmtShort(dueUnique),
+        sousTitre:'Année scolaire '+anneeScolaire+' — rentrée scolaire : '+U.fmtShort(rentree)+(sept.length?' — 1er mercredi d\'accueil réel : '+U.fmtShort(sept[0].date):''),
+        echeance:dueUnique
+      });
+    }
+    // 2. Fiche unique non modifiable à partir du dernier jour d'école de l'année (juillet) —
+    // jour précédant le début officiel des vacances d'été (calendrier officiel, indépendant des
+    // journées réellement créées : l'école se termine à cette date que le centre ait ou non
+    // enregistré de l'accueil ce jour-là).
+    var ete=VACANCES_SCOLAIRES.find(function(v){return v.anneeScolaire===anneeScolaire&&v.nom.indexOf('Été')===0;});
+    if(ete){
+      var dernierJourEcole=_addDays(ete.debut,-1);
+      out.push({
+        key:'tam_periscolaire_validation_'+_slug(anneeScolaire),kind:'periscolaire_validation',
+        titre:'TAM / SDJES — Fiche unique périscolaire non modifiable à partir du '+U.fmtShort(dernierJourEcole),
+        sousTitre:'Année scolaire '+anneeScolaire+' — dernier jour d\'école avant les vacances d\'été',
+        echeance:dernierJourEcole
+      });
+    }
+    return out;
+  }
+
+  // Calcule la liste complète des échéances actives + terminées, sans doublons
+  // (chaque échéance a un identifiant stable — clé "key" — reconnu d'un calcul à l'autre)
+  async function computeAlertes(){
+    var zone=await DB.getParam('p_zone','C');
+    var journees=await DB.getAll('journees');
+    var raw=[].concat(await _computeExtrascolaire(zone,journees),await _computePeriscolaire(journees));
+    var statusAll=await DB.getAll('tam_status');
+    var byKey={};
+    statusAll.forEach(function(r){byKey[r.alert_key]=r;});
+    var out=raw.map(function(a){
+      var rec=byKey[a.key];
+      var faitManuel=!!(rec&&rec.fait);
+      var statut=(faitManuel||a.couvertePar)?'termine':_statutEcheance(a.echeance);
+      return Object.assign({},a,{
+        statut:statut,
+        fait:faitManuel||!!a.couvertePar,
+        dateFait:rec?rec.date_fait:null,
+        auto:!!a.couvertePar&&!faitManuel
+      });
+    });
+    var ordre={retard:0,urgent:1,proche:2,avenir:3,termine:4};
+    out.sort(function(a,b){
+      if(ordre[a.statut]!==ordre[b.statut])return ordre[a.statut]-ordre[b.statut];
+      return(a.echeance||'').localeCompare(b.echeance||'');
+    });
+    return out;
+  }
+
+  async function marquerFait(key,titre,kind){
+    var all=await DB.getAll('tam_status');
+    var existing=all.find(function(r){return r.alert_key===key;});
+    var now=new Date().toISOString();
+    if(existing){existing.fait=true;existing.date_fait=now;if(titre)existing.titre=titre;if(kind)existing.kind=kind;await DB.put('tam_status',existing);}
+    else{await DB.add('tam_status',{alert_key:key,fait:true,date_fait:now,titre:titre||key,kind:kind||''});}
+    await DB.log('modification','Échéance TAM/SDJES marquée Fait : '+(titre||key));
+  }
+
+  async function annulerFait(key){
+    var all=await DB.getAll('tam_status');
+    var existing=all.find(function(r){return r.alert_key===key;});
+    if(existing){existing.fait=false;await DB.put('tam_status',existing);await DB.log('modification','Échéance TAM/SDJES réactivée : '+(existing.titre||key));}
+  }
+
+  async function marquerFaitUI(key){
+    var list=await computeAlertes();
+    var item=list.find(function(a){return a.key===key;});
+    await marquerFait(key,item?item.titre:key,item?item.kind:'');
+    U.toast('Échéance marquée comme faite','success');
+    if(typeof Dashboard!=='undefined')Dashboard.refresh();
+  }
+  async function annulerFaitUI(key){
+    await annulerFait(key);
+    U.toast('Échéance réactivée','success');
+    if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    var hp=document.getElementById('modal');
+    if(hp&&hp.style.display!=='none')openHistorique();
+  }
+
+  async function getHistorique(){
+    var all=await DB.getAll('tam_status');
+    return all.filter(function(r){return r.fait;}).sort(function(a,b){return(b.date_fait||'').localeCompare(a.date_fait||'');});
+  }
+
+  function _dueText(echeance,statut){
+    if(statut==='termine')return'';
+    var diff=U.diffDays(U.today(),echeance);
+    if(diff<0)return'En retard de '+Math.abs(diff)+' jour'+(Math.abs(diff)>1?'s':'');
+    if(diff===0)return'Échéance aujourd\'hui';
+    return'Dans '+diff+' jour'+(diff>1?'s':'');
+  }
+
+  function renderCard(a){
+    return'<div class="tam-card tam-'+a.statut+'">'+
+      '<i class="ti '+STATUT_ICO[a.statut]+' tam-ico"></i>'+
+      '<div class="tam-body">'+
+        '<div class="tam-title">'+U.esc(a.titre)+'</div>'+
+        (a.sousTitre?'<div class="tam-sub">'+U.esc(a.sousTitre)+'</div>':'')+
+        '<div class="tam-due">'+(
+          a.statut==='termine'
+            ?('<span class="badge badge-success"><i class="ti ti-check"></i> Terminé'+(a.dateFait?(' le '+U.fmtShort(a.dateFait.split('T')[0])):'')+'</span>'+(a.auto?' <span class="text-xs text-m">— couverte par une fiche initiale encore valide</span>':''))
+            :('Échéance : <strong>'+U.fmtShort(a.echeance)+'</strong> — '+_dueText(a.echeance,a.statut))
+        )+'</div>'+
+      '</div>'+
+      (a.statut!=='termine'
+        ?'<button class="btn btn-outline btn-sm" onclick="Tam.marquerFaitUI(\''+a.key+'\')"><i class="ti ti-check"></i> Marquer comme fait</button>'
+        :(a.auto?'':'<button class="btn btn-ghost btn-sm" onclick="Tam.annulerFaitUI(\''+a.key+'\')"><i class="ti ti-arrow-back-up"></i></button>')
+      )+
+    '</div>';
+  }
+
+  function renderCards(list){
+    return list.map(renderCard).join('');
+  }
+
+  async function openHistorique(){
+    var hist=await getHistorique();
+    U.modal({
+      title:'Historique des déclarations TAM / SDJES',
+      size:'lg',
+      body:hist.length?hist.map(function(r){
+        return'<div class="tam-card tam-termine"><i class="ti ti-circle-check tam-ico"></i>'+
+          '<div class="tam-body"><div class="tam-title">'+U.esc(r.titre||r.alert_key)+'</div>'+
+          '<div class="tam-due">Fait le '+U.fmtShort((r.date_fait||'').split('T')[0])+'</div></div>'+
+          '<button class="btn btn-ghost btn-sm" onclick="Tam.annulerFaitUI(\''+r.alert_key+'\')"><i class="ti ti-arrow-back-up"></i> Annuler</button>'+
+        '</div>';
+      }).join(''):'<div class="empty"><i class="ti ti-history"></i><p>Aucune déclaration validée pour le moment</p></div>',
+      footer:'<button class="btn btn-primary" id="tam-hist-close">Fermer</button>'
+    });
+    document.getElementById('tam-hist-close').onclick=U.closeModal;
+  }
+
+  return{computeAlertes,marquerFait,annulerFait,marquerFaitUI,annulerFaitUI,getHistorique,openHistorique,renderCard,renderCards,STATUT_L};
 })();
 
 // ===== CONTRATS =====
@@ -2532,7 +3360,7 @@ var Contrats = (function(){
     var preselKeys=contratExistant&&contratExistant.journees_ids?contratExistant.journees_ids:[];
 
     function jRow(j){
-      var cls={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info'}[j.type]||'neutral';
+      var cls=U.TYPE_BADGE_CLS[j.type]||'neutral';
       var key=j.id+'_'+j._src;
       var presel=preselKeys.includes(key);
       return'<label class="check-label" style="padding:.4rem .7rem;border-bottom:1px solid var(--gray-100);cursor:pointer" data-date="'+j.date+'" data-type="'+j.type+'" data-src="'+j._src+'" data-jid="'+j.id+'">'+
@@ -2558,12 +3386,13 @@ var Contrats = (function(){
           '<div class="form-group"><label class="form-label">Date de signature</label><input type="date" id="cf-sign" class="form-control" value="'+(contratExistant?contratExistant.date_creation:U.today())+'"/></div>'+
         '</div>'+
         '<div class="alert alert-info mb2" id="cf-sal-info" style="display:none"><i class="ti ti-filter"></i> Journées filtrées sur les affectations de cet animateur.</div>'+
+        '<div class="alert alert-danger mb2" id="cf-block-alert" style="display:none"></div>'+
         '<div class="form-group">'+
           '<label class="form-label">Journées à inclure</label>'+
           '<div style="display:flex;gap:.4rem;margin-bottom:.4rem">'+
             '<select id="cf-fan" class="form-control form-control-sm" style="flex:1"><option value="">Toutes années</option>'+[...new Set(allJ.map(function(j){return j.annee;}))].filter(Boolean).sort().reverse().map(function(a){return'<option value="'+a+'">'+a+'</option>';}).join('')+'</select>'+
             '<select id="cf-fm" class="form-control form-control-sm" style="flex:1"><option value="">Tous mois</option>'+U.MOIS.map(function(m,i){return'<option value="'+(i+1)+'">'+m+'</option>';}).join('')+'</select>'+
-            '<select id="cf-ft" class="form-control form-control-sm" style="flex:1"><option value="">Tous types</option><option value="periscolaire">Périscolaire</option><option value="extrascolaire">Extrascolaire</option><option value="reunion_prepa">Réunion prépa</option></select>'+
+            '<select id="cf-ft" class="form-control form-control-sm" style="flex:1"><option value="">Tous types</option>'+['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){return'<option value="'+t+'">'+U.TYPE_L[t]+'</option>';}).join('')+'</select>'+
             '<button class="btn btn-ghost btn-sm" id="cf-selall" title="Tout sélectionner visible"><i class="ti ti-check-all"></i></button>'+
           '</div>'+
           '<div id="cf-jlist" style="border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto">'+allJ.map(jRow).join('')+'</div>'+
@@ -2595,6 +3424,26 @@ var Contrats = (function(){
       applyFilters();
     }
 
+    // Blocage création de contrat si dossier animateur incomplet (ne s'applique pas en modification)
+    function _checkSalBlock(){
+      var ba=document.getElementById('cf-block-alert');
+      if(!ba)return;
+      var salId=parseInt((document.getElementById('cf-sal')||{}).value||0);
+      var sal=sals.find(function(s){return s.id===salId;});
+      var missing=isEdit?[]:U.animContractBlockers(sal);
+      var prevBtn=document.getElementById('cf-prev'),genBtn=document.getElementById('cf-gen');
+      if(missing.length){
+        ba.style.display='block';
+        ba.innerHTML='<i class="ti ti-alert-triangle"></i> <strong>Création de contrat bloquée</strong> — le dossier salarié de cet animateur est incomplet. Éléments manquants : '+missing.map(U.esc).join(', ')+'.';
+        if(prevBtn)prevBtn.disabled=true;
+        if(genBtn)genBtn.disabled=true;
+      } else {
+        ba.style.display='none';
+        if(prevBtn)prevBtn.disabled=false;
+        if(genBtn)genBtn.disabled=false;
+      }
+    }
+
     function applyFilters(){
       var an=(document.getElementById('cf-fan')||{}).value||'';
       var mo=(document.getElementById('cf-fm')||{}).value||'';
@@ -2609,7 +3458,7 @@ var Contrats = (function(){
       });
     }
 
-    document.getElementById('cf-sal').onchange=function(){filterBySal();calcRecap();};
+    document.getElementById('cf-sal').onchange=function(){filterBySal();calcRecap();_checkSalBlock();};
     ['cf-fan','cf-fm','cf-ft'].forEach(function(id){var el=document.getElementById(id);if(el)el.onchange=function(){applyFilters();calcRecap();};});
 
     function calcRecap(){
@@ -2635,13 +3484,13 @@ var Contrats = (function(){
     document.getElementById('cf-jlist').onchange=calcRecap;
     document.getElementById('cf-selall').onclick=function(){document.querySelectorAll('.jsel').forEach(function(c){var lb=c.closest('label');if(lb&&lb.style.display!=='none')c.checked=true;});calcRecap();};
 
-    if(initSalId)setTimeout(function(){filterBySal();calcRecap();},60);
+    if(initSalId)setTimeout(function(){filterBySal();calcRecap();_checkSalBlock();},60);
     else if(isEdit)setTimeout(calcRecap,60);
 
     document.getElementById('cf-cancel').onclick=U.closeModal;
-    document.getElementById('cf-prev').onclick=async function(){var h=await _buildHTML(sals,allJ);if(h){document.getElementById('cf-apercu').innerHTML=h.html;document.querySelector('.tab-btn[data-tab="cview"]').click();}};
+    document.getElementById('cf-prev').onclick=async function(){var h=await _buildHTML(sals,allJ,isEdit);if(h){document.getElementById('cf-apercu').innerHTML=h.html;document.querySelector('.tab-btn[data-tab="cview"]').click();}};
     document.getElementById('cf-gen').onclick=async function(){
-      var r=await _buildHTML(sals,allJ);if(!r)return;
+      var r=await _buildHTML(sals,allJ,isEdit);if(!r)return;
       var journeesIds=Array.from(document.querySelectorAll('.jsel:checked')).map(function(c){return c.dataset.id+'_'+c.dataset.src;});
       try{
         if(isEdit){
@@ -2658,11 +3507,15 @@ var Contrats = (function(){
     };
   }
 
-  async function _buildHTML(sals,allJ){
+  async function _buildHTML(sals,allJ,isEdit){
     var salId=parseInt((document.getElementById('cf-sal')||{}).value||0);
     if(!salId){U.toast('Sélectionnez un salarié','danger');return null;}
     var sal=sals.find(function(s){return s.id===salId;});
     if(!sal){U.toast('Salarié introuvable','danger');return null;}
+    if(!isEdit){
+      var blockers=U.animContractBlockers(sal);
+      if(blockers.length){U.toast('Impossible de créer le contrat : dossier incomplet ('+blockers.join(', ')+')','danger');return null;}
+    }
     var chk=document.querySelectorAll('.jsel:checked');
     if(!chk.length){U.toast('Sélectionnez au moins une journée','danger');return null;}
     var sel=[];
@@ -2970,7 +3823,7 @@ var Suivi = (function(){
   }
 
   function _bind(){
-    ['sv-sal','sv-mois','sv-an','sv-type'].forEach(function(id){var el=document.getElementById(id);if(el)el.onchange=refresh;});
+    ['sv-sal','sv-mois','sv-an','sv-type','sv-saltype'].forEach(function(id){var el=document.getElementById(id);if(el)el.onchange=refresh;});
   }
 
   async function refresh(){
@@ -2978,40 +3831,44 @@ var Suivi = (function(){
     var mois=parseInt((document.getElementById('sv-mois')||{}).value)||null;
     var an=parseInt((document.getElementById('sv-an')||{}).value)||null;
     var type=(document.getElementById('sv-type')||{}).value||null;
+    var saltype=(document.getElementById('sv-saltype')||{}).value||null;
     var sals=await DB.getAll('salaries');
     var affects=await DB.getAll('affectations');
     var jours=await DB.getAll('journees');
     var preps=await DB.getAll('preparations');
-    var list=sals.filter(function(s){return!s.archived&&(!salId||s.id===salId);});
+    var list=sals.filter(function(s){return!s.archived&&(!salId||s.id===salId)&&(!saltype||U.salType(s)===saltype);});
     var lignes=[];
     for(var s of list){
       var af=affects.filter(function(a){return a.salarie_id===s.id;});
       var allJ=af.map(function(a){return jours.find(function(j){return j.id===a.journee_id;});}).filter(Boolean);
-      // Séparer les journées d'accueil réel des réunions de préparation
-      var jj=allJ.filter(function(j){return j.type!=='reunion_prepa';});
+      // Séparer journées d'accueil réel / journées de bureau / réunions de préparation
+      var jj=allJ.filter(function(j){return j.type!=='reunion_prepa'&&!U.isTypeBureau(j.type);});
+      var jb=allJ.filter(function(j){return U.isTypeBureau(j.type);});
       var reunions=allJ.filter(function(j){return j.type==='reunion_prepa';});
       var pp=preps.filter(function(p){return p.salaries_ids&&p.salaries_ids.includes(s.id);});
-      if(an){jj=jj.filter(function(j){return j.annee===an;});reunions=reunions.filter(function(j){return j.annee===an;});pp=pp.filter(function(p){return p.annee===an;});}
-      if(mois){jj=jj.filter(function(j){return j.mois===mois;});reunions=reunions.filter(function(j){return j.mois===mois;});pp=pp.filter(function(p){return p.mois===mois;});}
-      if(type==='periscolaire'){jj=jj.filter(function(j){return j.type==='periscolaire';});reunions=[];pp=[];}
-      else if(type==='extrascolaire'){jj=jj.filter(function(j){return j.type==='extrascolaire';});reunions=[];pp=[];}
-      else if(type==='preparation'){jj=[];}
-      else if(type){jj=[];reunions=[];pp=[];}
+      if(an){jj=jj.filter(function(j){return j.annee===an;});jb=jb.filter(function(j){return j.annee===an;});reunions=reunions.filter(function(j){return j.annee===an;});pp=pp.filter(function(p){return p.annee===an;});}
+      if(mois){jj=jj.filter(function(j){return j.mois===mois;});jb=jb.filter(function(j){return j.mois===mois;});reunions=reunions.filter(function(j){return j.mois===mois;});pp=pp.filter(function(p){return p.mois===mois;});}
+      if(type==='periscolaire'){jb=[];reunions=[];pp=[];jj=jj.filter(function(j){return j.type==='periscolaire';});}
+      else if(type==='extrascolaire'){jb=[];reunions=[];pp=[];jj=jj.filter(function(j){return j.type==='extrascolaire';});}
+      else if(type==='preparation'){jj=[];jb=[];}
+      else if(U.isTypeBureau(type)){jj=[];reunions=[];pp=[];jb=jb.filter(function(j){return j.type===type;});}
+      else if(type){jj=[];jb=[];reunions=[];pp=[];}
       var nj=jj.length;
+      var njb=jb.length;
       // Réunions de préparation : équivalent calculé selon la durée (4h=0.5j, 8h=1j)
       var equivReunions=reunions.reduce(function(acc,r){return acc+calcEquivReunion(r.heure_debut,r.heure_fin);},0);
       var npj=pp.filter(function(p){return p.sous_type!=='demi_journee';}).length;
       var nd=pp.filter(function(p){return p.sous_type==='demi_journee';}).length;
-      var tot=nj+npj+nd*0.5+equivReunions;
+      var tot=nj+njb+npj+nd*0.5+equivReunions;
       if(tot===0&&!salId)continue;
-      lignes.push({s,nj,npj,nd,equivReunions,tot});
+      lignes.push({s,nj,njb,npj,nd,equivReunions,tot});
     }
     var tw=document.getElementById('sv-table');
-    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>J. accueil</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>BAFA</th></tr></thead><tbody>'+
-      lignes.map(function(r){return'<tr><td><strong>'+U.esc(r.s.nom)+' '+U.esc(r.s.prenom)+'</strong></td><td>'+r.nj+'</td><td>'+r.npj+'</td><td>'+r.nd+'</td><td>'+(r.equivReunions>0?U.fmtNum(r.equivReunions,2)+' j.':'—')+'</td><td><strong>'+U.fmtNum(r.tot,2)+'</strong></td><td>'+(U.BAFA_L[r.s.bafa_statut]||'—')+'</td></tr>';}).join('')+
+    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>Type</th><th>J. accueil</th><th>J. bureau</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>BAFA</th></tr></thead><tbody>'+
+      lignes.map(function(r){return'<tr><td><strong>'+U.esc(r.s.nom)+' '+U.esc(r.s.prenom)+'</strong></td><td>'+U.esc(U.SAL_TYPE_L[U.salType(r.s)])+'</td><td>'+r.nj+'</td><td>'+r.njb+'</td><td>'+r.npj+'</td><td>'+r.nd+'</td><td>'+(r.equivReunions>0?U.fmtNum(r.equivReunions,2)+' j.':'—')+'</td><td><strong>'+U.fmtNum(r.tot,2)+'</strong></td><td>'+(U.BAFA_L[r.s.bafa_statut]||'—')+'</td></tr>';}).join('')+
       '</tbody></table>':'<div class="empty" style="padding:2rem"><i class="ti ti-table"></i><p>Aucune donnée</p></div>';
-    var totx=lignes.reduce(function(a,r){return{nj:a.nj+r.nj,npj:a.npj+r.npj,nd:a.nd+r.nd,equivReunions:a.equivReunions+(r.equivReunions||0),tot:a.tot+r.tot};},{nj:0,npj:0,nd:0,equivReunions:0,tot:0});
-    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>':'';
+    var totx=lignes.reduce(function(a,r){return{nj:a.nj+r.nj,njb:a.njb+r.njb,npj:a.npj+r.npj,nd:a.nd+r.nd,equivReunions:a.equivReunions+(r.equivReunions||0),tot:a.tot+r.tot};},{nj:0,njb:0,npj:0,nd:0,equivReunions:0,tot:0});
+    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.njb+'</strong> j. bureau · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>':'';
   }
 
   return{init,refresh};
@@ -3057,16 +3914,18 @@ var Export = (function(){
       function inRange(date){if(!date)return true;var m=date.split('-').slice(0,2).join('-');return(!from||m>=from)&&(!to||m<=to);}
       var af=affects.filter(function(a){return a.salarie_id===s.id;});
       var allJours=af.map(function(a){return jours.find(function(j){return j.id===a.journee_id;});}).filter(Boolean).filter(function(j){return inRange(j.date);});
-      // Séparer accueil classique et réunions de préparation
-      var jj=allJours.filter(function(j){return j.type!=='reunion_prepa';});
+      // Séparer accueil classique, journées de bureau et réunions de préparation
+      var jj=allJours.filter(function(j){return j.type!=='reunion_prepa'&&!U.isTypeBureau(j.type);});
+      var jbur=allJours.filter(function(j){return U.isTypeBureau(j.type);});
       var reunions=allJours.filter(function(j){return j.type==='reunion_prepa';});
       var pp=preps.filter(function(p){return p.salaries_ids&&p.salaries_ids.includes(s.id)&&inRange(p.date);});
       var nj=jj.length;
+      var njb=jbur.length;
       var np=pp.filter(function(p){return p.sous_type!=='demi_journee';}).length;
       var nd=pp.filter(function(p){return p.sous_type==='demi_journee';}).length;
       // Réunions : équivalent calculé sur la durée (4h=0.5j, 8h=1j)
       var equivReunions=reunions.reduce(function(acc,r){return acc+calcEquivReunion(r.heure_debut,r.heure_fin);},0);
-      var equivTotal=nj+np+nd*0.5+equivReunions;
+      var equivTotal=nj+njb+np+nd*0.5+equivReunions;
       return{
         'Nom':s.nom,
         'Prénom':s.prenom,
@@ -3077,7 +3936,10 @@ var Export = (function(){
         'Demi-j. prépa':nd,
         'Réunion prépa (équiv. j.)':U.fmtNum(equivReunions,2),
         'Équivalent jours total':U.fmtNum(equivTotal,2),
-        'Email':s.email||''
+        'Email':s.email||'',
+        // Colonnes ajoutées en fin de tableau pour ne pas modifier l'ordre existant :
+        'Type de salarié':U.SAL_TYPE_L[U.salType(s)],
+        'J. bureau (admin./réunion/Point Clément)':njb
       };
     });
   }
