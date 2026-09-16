@@ -1150,6 +1150,10 @@ const U = (function(){
   var SAL_TYPE_L={animateur:'Animateur',technicien_restauration:'Technicien de restauration'};
   function salType(s){return(s&&s.type_salarie)||'animateur';} // rétrocompatibilité : absence de type = animateur
   function isTechnicien(s){return salType(s)==='technicien_restauration';}
+  // Le statut "directeur" est porté par le champ bafa_statut (indépendant du type_salarie
+  // animateur/technicien) — c'est la convention déjà utilisée ailleurs dans l'app (coûts, alertes
+  // de contrat) pour identifier les directeurs.
+  function isDirecteur(s){return!!(s&&s.bafa_statut==='directeur');}
   var AV_COLORS=['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#4F46E5','#9333EA','#16A34A'];
 
   function fmtDate(s,opts){
@@ -1332,7 +1336,7 @@ const U = (function(){
     return list.filter(function(s){return!s.archived;}).sort(function(a,b){return(a.nom+a.prenom).localeCompare(b.nom+b.prenom,'fr');});
   }
 
-  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,salType,isTechnicien,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
+  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,salType,isTechnicien,isDirecteur,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
 })();
 
 // ===== NAVIGATION / ROUTING =====
@@ -2281,6 +2285,20 @@ var Planning = (function(){
 
   async function refresh(){await render();}
 
+  // Libellés courts affichés sur les badges du calendrier — couvre les échéances automatiques et
+  // les alertes personnalisées (kind commençant par "custom_"), avec un intitulé générique de repli
+  // pour ne jamais afficher un badge vide en cas de type inconnu.
+  var TAM_CAL_LABELS={
+    periscolaire_unique:'Fiche unique (TAM)',
+    extrascolaire_initiale:'Fiche initiale (TAM)',
+    periscolaire_validation:'Verrouillage fiche (TAM)',
+    extrascolaire_complementaire:'Fiche compl. (TAM)',
+    custom_unique:'Alerte perso. — unique',
+    custom_initiale:'Alerte perso. — initiale',
+    custom_complementaire:'Alerte perso. — compl.',
+    custom_autre:'Alerte perso.'
+  };
+
   // Échéances TAM/SDJES à faire figurer dans l'agenda comme un rappel pour le directeur (fiche
   // unique périscolaire — création J-8j avant la rentrée et verrouillage au dernier jour d'école —,
   // fiche complémentaire extrascolaire, fiche initiale extrascolaire) : affichées à la date
@@ -2293,7 +2311,7 @@ var Planning = (function(){
     try{
       var alerts=await Tam.computeAlertes();
       return alerts.filter(function(a){
-        return a.kind==='periscolaire_unique'||a.kind==='extrascolaire_complementaire'||a.kind==='extrascolaire_initiale'||a.kind==='periscolaire_validation';
+        return a.kind==='periscolaire_unique'||a.kind==='extrascolaire_complementaire'||a.kind==='extrascolaire_initiale'||a.kind==='periscolaire_validation'||a._custom===true;
       }).map(function(a){
         return{date:a.echeance,type:'tam_rappel',_tam:true,tamKey:a.key,tamKind:a.kind,titre:a.titre,sousTitre:a.sousTitre,fait:!!a.fait};
       });
@@ -2336,7 +2354,7 @@ var Planning = (function(){
       html+='<div class="day-num">'+d+'</div>';
       evs.slice(0,2).forEach(function(e){
         if(e._tam){
-          var tamLabel=e.tamKind==='periscolaire_unique'?'Fiche unique (TAM)':(e.tamKind==='extrascolaire_initiale'?'Fiche initiale (TAM)':(e.tamKind==='periscolaire_validation'?'Verrouillage fiche (TAM)':'Fiche compl. (TAM)'));
+          var tamLabel=TAM_CAL_LABELS[e.tamKind]||'Alerte TAM';
           html+='<div class="cal-ev ev-tam'+(e.fait?' ev-tam-done':'')+'" data-tam="'+U.esc(e.tamKey)+'" title="'+U.esc(e.titre)+' — réservé au directeur, sans horaire">🔔 '+tamLabel+'</div>';
           return;
         }
@@ -2421,25 +2439,48 @@ var Planning = (function(){
     // faire ni à annuler ici, juste un rappel informatif de la couverture et de sa date limite.
     var couvertureHtml=a.couverture?('<p class="text-m" style="font-size:.8rem;margin-bottom:.5rem"><i class="ti ti-shield-check"></i> Couverte par la fiche initiale validée le '+U.fmtShort(a.couverture.dateFait)+' (valable jusqu\'au '+U.fmtShort(a.couverture.limite)+').</p>'):'';
     var footerBtn=a.fait?(a.auto?'':'<button class="btn btn-outline btn-sm" id="tam-info-undo"><i class="ti ti-arrow-back-up"></i> Annuler « fait »</button>'):'<button class="btn btn-primary" id="tam-info-done"><i class="ti ti-check"></i> Marquer comme fait</button>';
+    var delBtn=a._custom?'<button class="btn btn-ghost btn-sm" id="tam-info-del" title="Supprimer cette alerte"><i class="ti ti-trash"></i></button>':'';
     U.modal({
-      title:'Échéance TAM / SDJES',
+      title:a._custom?'Alerte TAM / SDJES personnalisée':'Échéance TAM / SDJES',
       body:'<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i> Rappel réservé au directeur — sans horaire, ne correspond à aucune journée d\'accueil.</div>'+
         '<p style="font-weight:600;margin-bottom:.3rem">'+U.esc(a.titre)+'</p>'+
         (a.sousTitre?'<p class="text-m" style="font-size:.85rem;margin-bottom:.5rem">'+U.esc(a.sousTitre)+'</p>':'')+
         couvertureHtml+
-        '<p style="font-size:.85rem">Statut : <strong>'+(Tam.STATUT_L[a.statut]||a.statut)+'</strong></p>',
-      footer:'<button class="btn btn-ghost" id="tam-info-close">Fermer</button>'+footerBtn
+        '<p style="font-size:.85rem">Statut : <strong>'+(Tam.STATUT_L[a.statut]||a.statut)+'</strong></p>'+
+        (a._custom&&a._validiteAns>0?'<p class="text-m" style="font-size:.8rem"><i class="ti ti-refresh"></i> Alerte récurrente — se reprogramme automatiquement tous les '+a._validiteAns+' an(s) après validation.</p>':''),
+      footer:'<button class="btn btn-ghost" id="tam-info-close">Fermer</button>'+delBtn+footerBtn
     });
     document.getElementById('tam-info-close').onclick=U.closeModal;
     var doneBtn=document.getElementById('tam-info-done');
     if(doneBtn)doneBtn.onclick=async function(){
-      await Tam.marquerFait(a.key,a.titre,a.kind);
-      U.closeModal();await render();
+      U.closeModal();
+      if(a._custom&&a._validiteAns>0){
+        var dc=await Tam.promptDeclarationDate(U.today());
+        if(!dc)return;
+        await Tam.marquerFaitCustomRecurrent(a._customId,dc);
+        U.toast('Alerte validée — prochaine échéance reprogrammée','success');
+      } else if(a.kind==='extrascolaire_initiale'){
+        var d=await Tam.promptDeclarationDate(U.today());
+        if(!d)return; // annulé — rien à faire
+        await Tam.marquerFait(a.key,a.titre,a.kind,d);
+      } else {
+        await Tam.marquerFait(a.key,a.titre,a.kind);
+      }
+      await render();
       if(typeof Dashboard!=='undefined')Dashboard.refresh();
     };
     var undoBtn=document.getElementById('tam-info-undo');
     if(undoBtn)undoBtn.onclick=async function(){
       await Tam.annulerFait(a.key);
+      U.closeModal();await render();
+      if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    };
+    var delB=document.getElementById('tam-info-del');
+    if(delB)delB.onclick=async function(){
+      var ok=await U.confirm({title:'Supprimer cette alerte ?',body:'Cette alerte TAM personnalisée et son historique seront définitivement supprimés.'});
+      if(!ok)return;
+      await Tam.deleteCustomAlert(a._customId);
+      U.toast('Alerte supprimée','danger');
       U.closeModal();await render();
       if(typeof Dashboard!=='undefined')Dashboard.refresh();
     };
@@ -2501,8 +2542,8 @@ var Planning = (function(){
       return'<div class="tech-row" style="border:1px solid var(--border);border-radius:8px;padding:.65rem;margin-bottom:.4rem">'+
         '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.4rem;align-items:end">'+
           '<div><label class="form-label" style="font-size:.72rem">Technicien de restauration</label><select class="form-control form-control-sm ts-sel"><option value="">— Choisir —</option>'+techOpts+'</select></div>'+
-          '<div><label class="form-label" style="font-size:.72rem">Début</label><input type="time" class="form-control form-control-sm td-in" value="'+(a?a.heure_debut||'07:30':'07:30')+'"/></div>'+
-          '<div><label class="form-label" style="font-size:.72rem">Fin</label><input type="time" class="form-control form-control-sm tf-in" value="'+(a?a.heure_fin||'18:30':'18:30')+'"/></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Début</label><input type="time" class="form-control form-control-sm td-in" value="'+(a?a.heure_debut||'09:30':'09:30')+'"/></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Fin</label><input type="time" class="form-control form-control-sm tf-in" value="'+(a?a.heure_fin||'15:00':'15:00')+'"/></div>'+
           '<div style="padding-top:1.3rem"><button type="button" class="icon-btn sm rm-tech"><i class="ti ti-x"></i></button></div>'+
         '</div>'+
         '<input type="text" class="form-control form-control-sm to-in" style="margin-top:.35rem" placeholder="Observations" value="'+(a?U.esc(a.observations||''):'')+'"/>'+
@@ -2538,7 +2579,7 @@ var Planning = (function(){
           '<div class="form-group" id="jf-ng-wrap"><label class="form-label">Enfants Grands (6–12 ans)</label><input type="number" id="jf-ng" class="form-control" min="0" value="'+(j?j.nb_grands||0:0)+'"/></div>'+
         '</div>'+
         '<div class="form-group"><label class="form-label">Commentaire</label><textarea id="jf-com" class="form-control" rows="2">'+(j?U.esc(j.commentaire||''):'')+'</textarea></div>'+
-        '<div id="jf-reunion-sals" class="form-group" style="display:none"><label class="form-label">Salariés affectés à cette journée</label><select id="jf-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés</p></div>'+
+        '<div id="jf-reunion-sals" class="form-group" style="display:none"><label class="form-label">Salariés affectés à cette journée</label><select id="jf-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint" id="jf-reunion-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés</p></div>'+
         '<div id="enc-live"></div>'+
       '</div>'+
       '<div class="tab-pane" data-tab="janim">'+
@@ -2551,7 +2592,7 @@ var Planning = (function(){
         '<div id="tech-rows">'+techInitRows+'</div>'+
         '<button type="button" class="btn btn-outline btn-sm mt2" id="btn-add-tech"><i class="ti ti-plus"></i> Ajouter technicien de restauration</button>'+
       '</div>',
-      footer:'<button class="btn btn-ghost" id="jf-cancel">Annuler</button>'+(id?'<button class="btn btn-danger btn-sm" id="jf-del"><i class="ti ti-trash"></i></button>':'')+'<button class="btn btn-primary" id="jf-save"><i class="ti ti-device-floppy"></i> Enregistrer</button>'
+      footer:'<button class="btn btn-ghost" id="jf-cancel">Annuler</button>'+(id?'<button class="btn btn-danger btn-sm" id="jf-del"><i class="ti ti-trash"></i></button>':'')+'<button type="button" class="btn btn-outline btn-sm" id="jf-tam-alert" title="Créer une alerte TAM/SDJES, indépendante de cette journée"><i class="ti ti-bell-plus"></i> Alerte TAM</button>'+'<button class="btn btn-primary" id="jf-save"><i class="ti ti-device-floppy"></i> Enregistrer</button>'
     });
 
     U.initTabs(document.getElementById('modal-body'));
@@ -2571,6 +2612,17 @@ var Planning = (function(){
       if(reunW)reunW.style.display=isSimple?'':'none';
       if(hfmW)hfmW.style.display=isAdmin?'':'none';
       if(hdamW)hdamW.style.display=isAdmin?'':'none';
+      // Journées administratives : seul le directeur est concerné — la liste des salariés
+      // affectables est restreinte en conséquence (les autres types de journées "simples"
+      // — réunion de préparation, réunion de bureau, point Clément — restent ouverts à tous).
+      var rsel=document.getElementById('jf-reunion-sel');
+      var rhint=document.getElementById('jf-reunion-hint');
+      if(rsel){
+        var pool=isAdmin?sals.filter(U.isDirecteur):sals;
+        var prevSel=new Set(Array.from(rsel.selectedOptions).map(function(o){return o.value;}));
+        rsel.innerHTML=pool.map(function(s){return'<option value="'+s.id+'"'+(prevSel.has(String(s.id))?' selected':'')+'>'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('');
+      }
+      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés';
       var encLive=document.getElementById('enc-live');
       if(isSimple&&encLive)encLive.innerHTML='';
       if(isSimple){
@@ -2580,7 +2632,18 @@ var Planning = (function(){
         }
       }
     }
-    document.getElementById('jf-type').onchange=function(){_toggleTypeUI();_calcEnc();};
+    document.getElementById('jf-type').onchange=function(){
+      // Passage au type "administratif" (via l'utilisateur) : préremplir les horaires dédiés au
+      // directeur — ne s'applique qu'au changement de type, pas au chargement initial du formulaire
+      // (édition d'une journée existante), pour ne jamais écraser des horaires déjà enregistrés.
+      if(this.value==='administratif'){
+        document.getElementById('jf-hd').value='08:30';
+        document.getElementById('jf-hfm').value='12:30';
+        document.getElementById('jf-hdam').value='13:30';
+        document.getElementById('jf-hf').value='17:15';
+      }
+      _toggleTypeUI();_calcEnc();
+    };
     _toggleTypeUI();
     // Pré-sélectionner les salariés déjà affectés si édition d'une journée en mode simple (réunion/bureau)
     if(j&&isSimpleAssign(j.type)&&affects.length){
@@ -2629,6 +2692,18 @@ var Planning = (function(){
     document.getElementById('jf-save').onclick=function(){_saveJournee(id,affects);};
     var jd=document.getElementById('jf-del');
     if(jd)jd.onclick=function(){_delJournee(id);};
+    // Création d'alerte TAM personnalisée : simple point d'accès pratique depuis le formulaire de
+    // journée — l'alerte créée n'est liée ni à cette journée ni à sa date, elle est indépendante
+    // (cf. décision produit). La date de la journée est reprise uniquement comme valeur par défaut
+    // pratique du champ « échéance », librement modifiable. Rouvre le formulaire de journée ensuite
+    // (les champs non enregistrés du formulaire sont réinitialisés, comme pour toute navigation modale).
+    var jta=document.getElementById('jf-tam-alert');
+    if(jta)jta.onclick=async function(){
+      var curDate=(document.getElementById('jf-date')||{}).value||dateDefault;
+      await Tam.openCreateCustomAlert(curDate);
+      await openJournee(id,curDate);
+      if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    };
   }
 
   function _bindRemAnim(){
@@ -2844,8 +2919,10 @@ var Planning = (function(){
     }
     function jbcTechRow(){
       return'<div class="tech-row" style="border:1px solid var(--border);border-radius:8px;padding:.5rem;margin-bottom:.35rem">'+
-        '<div style="display:grid;grid-template-columns:2fr auto;gap:.4rem;align-items:end">'+
+        '<div style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.4rem;align-items:end">'+
           '<div><label class="form-label" style="font-size:.72rem">Technicien de restauration</label><select class="form-control form-control-sm ts-sel"><option value="">— Choisir —</option>'+techOpts+'</select></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Début</label><input type="time" class="form-control form-control-sm td-in" value="09:30"/></div>'+
+          '<div><label class="form-label" style="font-size:.72rem">Fin</label><input type="time" class="form-control form-control-sm tf-in" value="15:00"/></div>'+
           '<div style="padding-top:1.3rem"><button type="button" class="icon-btn sm rm-tech"><i class="ti ti-x"></i></button></div>'+
         '</div>'+
       '</div>';
@@ -2872,7 +2949,7 @@ var Planning = (function(){
         '<div style="display:flex;flex-wrap:wrap;gap:.6rem">'+DOWS.map(function(d){return'<label class="check-label"><input type="checkbox" class="jbc-dow" value="'+d.v+'"'+(d.v>=1&&d.v<=5?' checked':'')+'/> '+d.l+'</label>';}).join('')+'</div></div>'+
         '<div class="form-group"><label class="form-label">Commentaire</label><input type="text" id="jbc-com" class="form-control" placeholder="Optionnel"/></div>'+
         '<hr class="divider"/>'+
-        '<div class="form-group" id="jbc-pers-simple" style="display:none"><label class="form-label">Salariés affectés</label><select id="jbc-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée</p></div>'+
+        '<div class="form-group" id="jbc-pers-simple" style="display:none"><label class="form-label">Salariés affectés</label><select id="jbc-reunion-sel" class="form-control" multiple size="5">'+sals.map(function(s){return'<option value="'+s.id+'">'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('')+'</select><p class="form-hint" id="jbc-reunion-hint">Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée</p></div>'+
         '<div id="jbc-pers-accueil" style="display:none">'+
           '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Animateurs</div>'+
           '<div id="jbc-anim-rows"></div>'+
@@ -2881,7 +2958,7 @@ var Planning = (function(){
           '<div style="font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-m);margin-bottom:.4rem">Techniciens de restauration</div>'+
           '<div id="jbc-tech-rows"></div>'+
           '<button type="button" class="btn btn-outline btn-sm mt2" id="jbc-add-tech"><i class="ti ti-plus"></i> Ajouter technicien de restauration</button>'+
-          '<p class="form-hint mt2">Affectés identiquement à chaque journée créée, avec les horaires définis ci-dessus.</p>'+
+          '<p class="form-hint mt2">Animateurs affectés identiquement à chaque journée créée, avec les horaires définis ci-dessus. Chaque technicien de restauration a ses propres horaires (différents de l\'ouverture de la journée), appliqués identiquement à chaque journée créée.</p>'+
         '</div>'+
         '<div id="jbc-recap" class="alert alert-info" style="display:none"></div>',
       footer:'<button class="btn btn-ghost" id="jbc-cancel">Annuler</button><button class="btn btn-primary" id="jbc-ok"><i class="ti ti-stack-2"></i> Créer les journées</button>'
@@ -2913,6 +2990,15 @@ var Planning = (function(){
       if(hdamW)hdamW.style.display=isAdmin?'':'none';
       if(npW)npW.style.display=isSimple?'none':'';
       if(ngW)ngW.style.display=isSimple?'none':'';
+      // Journées administratives : seul le directeur est concerné.
+      var rsel=document.getElementById('jbc-reunion-sel');
+      var rhint=document.getElementById('jbc-reunion-hint');
+      if(rsel){
+        var pool=isAdmin?sals.filter(U.isDirecteur):sals;
+        var prevSel=new Set(Array.from(rsel.selectedOptions).map(function(o){return o.value;}));
+        rsel.innerHTML=pool.map(function(s){return'<option value="'+s.id+'"'+(prevSel.has(String(s.id))?' selected':'')+'>'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('');
+      }
+      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée';
     }
 
     document.getElementById('jbc-anim-rows').insertAdjacentHTML('beforeend',jbcAnimRow());
@@ -2927,7 +3013,17 @@ var Planning = (function(){
       _bulkBindRemTech();
     };
 
-    ['jbc-from','jbc-to','jbc-type'].forEach(function(id){document.getElementById(id).onchange=function(){_bulkToggleTypeUI();_bulkPreview();};});
+    ['jbc-from','jbc-to'].forEach(function(id){document.getElementById(id).onchange=_bulkPreview;});
+    document.getElementById('jbc-type').onchange=function(){
+      // Passage au type "administratif" : préremplir les horaires dédiés au directeur.
+      if(this.value==='administratif'){
+        document.getElementById('jbc-hd').value='08:30';
+        document.getElementById('jbc-hfm').value='12:30';
+        document.getElementById('jbc-hdam').value='13:30';
+        document.getElementById('jbc-hf').value='17:15';
+      }
+      _bulkToggleTypeUI();_bulkPreview();
+    };
     document.querySelectorAll('.jbc-dow').forEach(function(c){c.onchange=_bulkPreview;});
     document.getElementById('jbc-np').oninput=_bulkPreview;
     document.getElementById('jbc-ng').oninput=_bulkPreview;
@@ -2959,7 +3055,11 @@ var Planning = (function(){
       var rsel=document.getElementById('jbc-reunion-sel');
       var rids=isSimple&&rsel?Array.from(rsel.selectedOptions).map(function(o){return parseInt(o.value);}):[];
       var animAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-anim-rows .anim-row')).map(function(r){return{sid:parseInt(r.querySelector('.as-sel').value)||0,groupe:r.querySelector('.ag-sel').value};}).filter(function(x){return x.sid;});
-      var techAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-tech-rows .tech-row')).map(function(r){return parseInt(r.querySelector('.ts-sel').value)||0;}).filter(function(x){return x;});
+      // Chaque technicien de restauration a ses propres horaires (distincts de l'ouverture de la
+      // journée), saisis sur sa ligne — appliqués identiquement à chaque journée créée.
+      var techAssigns=isSimple?[]:Array.from(document.querySelectorAll('#jbc-tech-rows .tech-row')).map(function(r){return{sid:parseInt(r.querySelector('.ts-sel').value)||0,hd:r.querySelector('.td-in').value,hf:r.querySelector('.tf-in').value};}).filter(function(x){return x.sid;});
+      var badTech=techAssigns.find(function(x){return x.hd&&x.hf&&x.hf<=x.hd;});
+      if(badTech){U.toast('Technicien de restauration : l\'heure de fin doit être postérieure à l\'heure de début','danger');return;}
       var existing=await DB.getAll('journees');
       var existSet={};
       existing.forEach(function(j){existSet[j.date+'|'+j.type]=true;});
@@ -2982,8 +3082,8 @@ var Planning = (function(){
             await DB.add('affectations',{journee_id:jid,salarie_id:ar2.sid,groupe:ar2.groupe,heure_debut:hd,heure_fin:hf,observations:'',date:d});
             affectCreated++;
           }
-          for(var tsid3 of techAssigns){
-            await DB.add('affectations',{journee_id:jid,salarie_id:tsid3,groupe:'technicien',heure_debut:hd,heure_fin:hf,observations:'',date:d});
+          for(var tr3 of techAssigns){
+            await DB.add('affectations',{journee_id:jid,salarie_id:tr3.sid,groupe:'technicien',heure_debut:tr3.hd,heure_fin:tr3.hf,observations:'',date:d});
             affectCreated++;
           }
         }
@@ -3093,9 +3193,33 @@ var Planning = (function(){
 var Tam = (function(){
   var STATUT_L={avenir:'À venir',proche:'Échéance proche',urgent:'Urgent',retard:'En retard',termine:'Terminé'};
   var STATUT_ICO={avenir:'ti-calendar',proche:'ti-clock',urgent:'ti-alert-triangle',retard:'ti-alert-octagon',termine:'ti-circle-check'};
+  // Alertes personnalisées (créées manuellement depuis le planning, indépendantes des journées) :
+  // stockées dans le store 'tam_custom' (aucune migration nécessaire — DB.getAll/add/put/del
+  // fonctionnent sur n'importe quel nom de store). kind identifie le "type" affiché à l'utilisateur ;
+  // validiteAns>0 = alerte récurrente (se reprogramme elle-même à chaque validation, cf.
+  // marquerFaitCustomRecurrent) ; validiteAns===0 = alerte ponctuelle (suit le même mécanisme
+  // Fait/À faire que les échéances automatiques, via le store tam_status).
+  var CUSTOM_KIND_L={custom_unique:'Alerte personnalisée — Fiche unique',custom_initiale:'Alerte personnalisée — Fiche initiale',custom_complementaire:'Alerte personnalisée — Fiche complémentaire',custom_autre:'Alerte personnalisée — Autre'};
 
   function _slug(s){
     return(s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+  }
+  // Famille d'une période de vacances, indépendante de l'année (ex. "Toussaint 2026" -> "Toussaint") :
+  // la validité 3 ans d'une fiche initiale ne couvre que les occurrences futures de LA MÊME période
+  // (règle : "remettre une alerte dans 3 ans pour la même période"), jamais les autres périodes de
+  // l'année scolaire (Noël, Hiver, etc.) qui tombent par coïncidence dans la même fenêtre de 3 ans.
+  var FAMILLES_VACANCES=['Toussaint','Noël','Hiver','Printemps','Été'];
+  function _familleVacances(nom){
+    return(nom||'').replace(/\s*\d{4}\s*$/,'').trim();
+  }
+  // Déduit la famille d'un enregistrement tam_status déjà validé à partir de sa clé (celle-ci encode
+  // toujours le nom de la période, ex. "tam_extrascolaire_initiale_2026_2027_toussaint_2026") — évite
+  // toute migration de données : fonctionne aussi sur les fiches validées avant ce correctif.
+  function _familleFromKey(key){
+    for(var i=0;i<FAMILLES_VACANCES.length;i++){
+      if((key||'').indexOf('_'+_slug(FAMILLES_VACANCES[i])+'_')!==-1)return FAMILLES_VACANCES[i];
+    }
+    return null;
   }
   function _addMonths(dateStr,n){var d=new Date(dateStr+'T00:00:00');d.setMonth(d.getMonth()+n);return U.isoLocal(d);}
   function _addDays(dateStr,n){var d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);return U.isoLocal(d);}
@@ -3132,12 +3256,15 @@ var Tam = (function(){
       var slug=_slug(p.anneeScolaire)+'_'+_slug(p.nom);
       var keyInit='tam_extrascolaire_initiale_'+slug;
       var dueInit=_addMonths(premierAccueil,-2);
-      // Validité 3 ans : une fiche initiale déjà validée (sur cette période ou une autre) couvre
-      // toute période dont le 1er jour d'accueil réel tombe dans les 3 ans suivant sa validation.
-      // La date de validation est conservée (date_fait, store tam_status) : une fois les 3 ans
-      // écoulés, plus aucune période ne tombe dans la fenêtre et une alerte réapparaît naturellement.
+      // Validité 3 ans : une fiche initiale déjà validée pour CETTE MÊME période (ex. Toussaint)
+      // couvre les occurrences futures de cette période dont le 1er jour d'accueil réel tombe dans
+      // les 3 ans suivant sa validation. Ne couvre jamais une période différente (Noël, Hiver…)
+      // même si celle-ci tombe dans la même fenêtre de 3 ans. La date de validation est conservée
+      // (date_fait, store tam_status) : une fois les 3 ans écoulés, l'alerte réapparaît naturellement.
+      var famille=_familleVacances(p.nom);
       var couvranteRec=doneInitiales.find(function(d){
         if(d.alert_key===keyInit)return false;
+        if(_familleFromKey(d.alert_key)!==famille)return false;
         var dateFaitJour=d.date_fait.split('T')[0];
         var limite=_addMonths(dateFaitJour,36);
         return dateFaitJour<=premierAccueil&&limite>=premierAccueil;
@@ -3206,12 +3333,100 @@ var Tam = (function(){
     return out;
   }
 
+  // ----- Alertes personnalisées -----
+  async function listCustomAlerts(){
+    var all=await DB.getAll('tam_custom');
+    return all.sort(function(a,b){return(a.echeance||'').localeCompare(b.echeance||'');});
+  }
+  async function createCustomAlert(data){
+    var rec={titre:(data.titre||'').trim(),sousTitre:(data.sousTitre||'').trim(),kind:data.kind||'custom_autre',echeance:data.echeance,validiteAns:parseInt(data.validiteAns,10)||0,historique:[]};
+    var id=await DB.add('tam_custom',rec);
+    await DB.log('creation','Alerte TAM personnalisée créée : '+rec.titre);
+    return Object.assign({id:id},rec);
+  }
+  async function deleteCustomAlert(id){
+    await DB.del('tam_custom',id);
+    var statusAll=await DB.getAll('tam_status');
+    var key='tam_custom_'+id;
+    var rec=statusAll.find(function(r){return r.alert_key===key;});
+    if(rec)await DB.del('tam_status',rec.id);
+    await DB.log('suppression','Alerte TAM personnalisée supprimée');
+  }
+  // Validation d'une alerte personnalisée récurrente : n'utilise PAS tam_status (qui servirait à la
+  // figer en "Terminé") — l'échéance du store tam_custom est directement avancée de validiteAns
+  // années (calculée à partir de l'échéance courante, pour garder une cadence stable dans le temps),
+  // et la validation est tracée dans historique[] pour être consultable sans perdre l'échéance
+  // précédemment couverte.
+  async function marquerFaitCustomRecurrent(customId,dateDeclaration){
+    var rec=await DB.get('tam_custom',customId);
+    if(!rec)return;
+    var dateFait=dateDeclaration||U.today();
+    var hist=rec.historique||[];
+    hist.push({date_fait:dateFait,echeance_couverte:rec.echeance});
+    rec.historique=hist;
+    rec.echeance=_addMonths(rec.echeance,(rec.validiteAns||1)*12);
+    await DB.put('tam_custom',rec);
+    await DB.log('modification','Alerte TAM personnalisée validée : '+(rec.titre||('#'+customId))+' — prochaine échéance : '+U.fmtShort(rec.echeance));
+  }
+
+  // Petite modale de création d'une alerte personnalisée, accessible en pratique depuis le
+  // formulaire de journée du planning mais totalement indépendante de la journée en cours (aucun
+  // lien n'est conservé avec elle). Retourne l'enregistrement créé, ou null si annulé.
+  function openCreateCustomAlert(defaultDate){
+    return new Promise(function(resolve){
+      U.modal({
+        title:'Nouvelle alerte TAM / SDJES personnalisée',
+        body:'<div class="form-group"><label class="form-label">Titre <span class="req">*</span></label><input type="text" id="tc-titre" class="form-control" placeholder="Ex. : Renouvellement assurance"/></div>'+
+          '<div class="form-group"><label class="form-label">Sous-titre / précisions</label><input type="text" id="tc-sous" class="form-control"/></div>'+
+          '<div class="g2">'+
+            '<div class="form-group"><label class="form-label">Type d\'alerte</label><select id="tc-kind" class="form-control">'+
+              '<option value="custom_unique">Fiche unique</option>'+
+              '<option value="custom_initiale">Fiche initiale</option>'+
+              '<option value="custom_complementaire">Fiche complémentaire</option>'+
+              '<option value="custom_autre" selected>Autre</option>'+
+            '</select></div>'+
+            '<div class="form-group"><label class="form-label">Échéance <span class="req">*</span></label><input type="date" id="tc-echeance" class="form-control" value="'+(defaultDate||U.today())+'"/></div>'+
+          '</div>'+
+          '<div class="form-group"><label class="form-label">Récurrence</label><select id="tc-recur" class="form-control"><option value="0">Ponctuelle (pas de répétition)</option><option value="1">Tous les ans</option><option value="2">Tous les 2 ans</option><option value="3">Tous les 3 ans</option></select>'+
+          '<p class="form-hint">Si récurrente, une fois validée l\'alerte se reprogramme automatiquement à l\'échéance suivante.</p></div>',
+        footer:'<button class="btn btn-ghost" id="tc-cancel">Annuler</button><button class="btn btn-primary" id="tc-ok"><i class="ti ti-check"></i> Créer</button>'
+      });
+      document.getElementById('tc-cancel').onclick=function(){U.closeModal();resolve(null);};
+      document.getElementById('tc-ok').onclick=async function(){
+        var titre=document.getElementById('tc-titre').value.trim();
+        var echeance=document.getElementById('tc-echeance').value;
+        if(!titre){U.toast('Titre obligatoire','danger');return;}
+        if(!echeance){U.toast('Échéance obligatoire','danger');return;}
+        var rec=await createCustomAlert({
+          titre:titre,
+          sousTitre:document.getElementById('tc-sous').value,
+          kind:document.getElementById('tc-kind').value,
+          echeance:echeance,
+          validiteAns:document.getElementById('tc-recur').value
+        });
+        U.closeModal();
+        U.toast('Alerte TAM créée','success');
+        resolve(rec);
+      };
+    });
+  }
+
   // Calcule la liste complète des échéances actives + terminées, sans doublons
   // (chaque échéance a un identifiant stable — clé "key" — reconnu d'un calcul à l'autre)
   async function computeAlertes(){
     var zone=await DB.getParam('p_zone','C');
     var journees=await DB.getAll('journees');
-    var raw=[].concat(await _computeExtrascolaire(zone,journees),await _computePeriscolaire(journees));
+    var customs=await listCustomAlerts();
+    var customRaw=customs.map(function(c){
+      return{
+        key:'tam_custom_'+c.id,kind:c.kind,
+        titre:c.titre,
+        sousTitre:c.sousTitre||'',
+        echeance:c.echeance,
+        _custom:true,_customId:c.id,_validiteAns:c.validiteAns||0
+      };
+    });
+    var raw=[].concat(await _computeExtrascolaire(zone,journees),await _computePeriscolaire(journees),customRaw);
     var statusAll=await DB.getAll('tam_status');
     var byKey={};
     statusAll.forEach(function(r){byKey[r.alert_key]=r;});
@@ -3234,13 +3449,39 @@ var Tam = (function(){
     return out;
   }
 
-  async function marquerFait(key,titre,kind){
+  // dateDeclaration (optionnel, "YYYY-MM-DD") : date à laquelle la déclaration a réellement été
+  // effectuée. Utilisée pour les fiches initiales extrascolaires, dont la validité 3 ans démarre à
+  // partir de cette date (et non de la date à laquelle on clique sur "Marquer comme fait") — cette
+  // date ne s'applique qu'à CETTE fiche, sans effet sur les autres échéances. À défaut, on utilise
+  // la date/heure actuelle (comportement historique, pour les échéances sans saisie de date dédiée).
+  async function marquerFait(key,titre,kind,dateDeclaration){
     var all=await DB.getAll('tam_status');
     var existing=all.find(function(r){return r.alert_key===key;});
-    var now=new Date().toISOString();
+    var now=dateDeclaration?(dateDeclaration+'T00:00:00.000Z'):new Date().toISOString();
     if(existing){existing.fait=true;existing.date_fait=now;if(titre)existing.titre=titre;if(kind)existing.kind=kind;await DB.put('tam_status',existing);}
     else{await DB.add('tam_status',{alert_key:key,fait:true,date_fait:now,titre:titre||key,kind:kind||''});}
-    await DB.log('modification','Échéance TAM/SDJES marquée Fait : '+(titre||key));
+    await DB.log('modification','Échéance TAM/SDJES marquée Fait : '+(titre||key)+(dateDeclaration?' (déclaration du '+U.fmtShort(dateDeclaration)+')':''));
+  }
+
+  // Petite modale de saisie : demande la date à laquelle la déclaration TAM / SDJES a réellement
+  // été effectuée (fiches initiales extrascolaires uniquement — validité 3 ans à partir de cette
+  // date). Retourne la date ("YYYY-MM-DD") ou null si l'utilisateur annule.
+  function promptDeclarationDate(defaultDate){
+    return new Promise(function(resolve){
+      U.modal({
+        title:'Date de la déclaration',
+        body:'<div class="alert alert-info mb2"><i class="ti ti-info-circle"></i> La validité de 3 ans de cette fiche initiale démarre à partir de la date saisie ci-dessous — elle ne concerne que cette fiche.</div>'+
+          '<div class="form-group"><label class="form-label">Date à laquelle la déclaration a été effectuée <span class="req">*</span></label><input type="date" id="tam-decl-date" class="form-control" value="'+(defaultDate||U.today())+'" max="'+U.today()+'"/></div>',
+        footer:'<button class="btn btn-ghost" id="tam-decl-cancel">Annuler</button><button class="btn btn-primary" id="tam-decl-ok"><i class="ti ti-check"></i> Confirmer</button>'
+      });
+      document.getElementById('tam-decl-cancel').onclick=function(){U.closeModal();resolve(null);};
+      document.getElementById('tam-decl-ok').onclick=function(){
+        var v=(document.getElementById('tam-decl-date')||{}).value;
+        if(!v){U.toast('Date obligatoire','danger');return;}
+        if(v>U.today()){U.toast('La date de déclaration ne peut pas être dans le futur','danger');return;}
+        U.closeModal();resolve(v);
+      };
+    });
   }
 
   async function annulerFait(key){
@@ -3252,7 +3493,23 @@ var Tam = (function(){
   async function marquerFaitUI(key){
     var list=await computeAlertes();
     var item=list.find(function(a){return a.key===key;});
-    await marquerFait(key,item?item.titre:key,item?item.kind:'');
+    // Alerte personnalisée récurrente : ne passe jamais par tam_status (elle ne doit pas rester
+    // figée en "Terminé"), elle avance directement sa propre échéance de validiteAns années.
+    if(item&&item._custom&&item._validiteAns>0){
+      var dr=await promptDeclarationDate(U.today());
+      if(!dr)return;
+      await marquerFaitCustomRecurrent(item._customId,dr);
+      U.toast('Alerte validée — prochaine échéance reprogrammée','success');
+      if(typeof Dashboard!=='undefined')Dashboard.refresh();
+      return;
+    }
+    if(item&&item.kind==='extrascolaire_initiale'){
+      var d=await promptDeclarationDate(U.today());
+      if(!d)return; // annulé — rien à faire
+      await marquerFait(key,item.titre,item.kind,d);
+    } else {
+      await marquerFait(key,item?item.titre:key,item?item.kind:'');
+    }
     U.toast('Échéance marquée comme faite','success');
     if(typeof Dashboard!=='undefined')Dashboard.refresh();
   }
@@ -3293,7 +3550,19 @@ var Tam = (function(){
         ?'<button class="btn btn-outline btn-sm" onclick="Tam.marquerFaitUI(\''+a.key+'\')"><i class="ti ti-check"></i> Marquer comme fait</button>'
         :(a.auto?'':'<button class="btn btn-ghost btn-sm" onclick="Tam.annulerFaitUI(\''+a.key+'\')"><i class="ti ti-arrow-back-up"></i></button>')
       )+
+      (a._custom?'<button class="btn btn-ghost btn-sm" title="Supprimer cette alerte" onclick="Tam.deleteCustomAlertUI('+a._customId+')"><i class="ti ti-trash"></i></button>':'')+
     '</div>';
+  }
+
+  async function deleteCustomAlertUI(id){
+    var ok=await U.confirm({title:'Supprimer cette alerte ?',body:'Cette alerte TAM personnalisée et son historique seront définitivement supprimés.'});
+    if(!ok)return;
+    await deleteCustomAlert(id);
+    U.toast('Alerte supprimée','danger');
+    if(typeof Dashboard!=='undefined')Dashboard.refresh();
+    var hp=document.getElementById('modal');
+    if(hp&&hp.style.display!=='none')U.closeModal();
+    if(typeof Planning!=='undefined'&&Planning.render)Planning.render();
   }
 
   function renderCards(list){
@@ -3317,7 +3586,7 @@ var Tam = (function(){
     document.getElementById('tam-hist-close').onclick=U.closeModal;
   }
 
-  return{computeAlertes,marquerFait,annulerFait,marquerFaitUI,annulerFaitUI,getHistorique,openHistorique,renderCard,renderCards,STATUT_L};
+  return{computeAlertes,marquerFait,annulerFait,marquerFaitUI,annulerFaitUI,getHistorique,openHistorique,renderCard,renderCards,promptDeclarationDate,STATUT_L,CUSTOM_KIND_L,listCustomAlerts,createCustomAlert,deleteCustomAlert,deleteCustomAlertUI,marquerFaitCustomRecurrent,openCreateCustomAlert};
 })();
 
 // ===== CONTRATS =====
@@ -3881,15 +4150,46 @@ var Suivi = (function(){
       var npj=pp.filter(function(p){return p.sous_type!=='demi_journee';}).length;
       var nd=pp.filter(function(p){return p.sous_type==='demi_journee';}).length;
       var tot=nj+njb+npj+nd*0.5+equivReunions;
-      if(tot===0&&!salId)continue;
-      lignes.push({s,nj,njb,npj,nd,equivReunions,tot});
+      // Directeur et technicien de restauration : suivi en HEURES TRAVAILLÉES, pas en journées —
+      // calculées à partir des horaires réels de chaque affectation (déjeuner déduit pour les
+      // journées administratives, qui ont leurs propres heure_fin_matin/heure_debut_apm).
+      var enHeures=U.isDirecteur(s)||U.isTechnicien(s);
+      var heures=0;
+      if(enHeures){
+        jj.concat(jb).concat(reunions).forEach(function(j){
+          var a=af.find(function(x){return x.journee_id===j.id;});
+          heures+=_dureeHeures(a,j);
+        });
+        pp.forEach(function(p){heures+=_dureeHeures(p,null);});
+      }
+      if(tot===0&&heures===0&&!salId)continue;
+      lignes.push({s,nj,njb,npj,nd,equivReunions,tot,enHeures,heures});
     }
     var tw=document.getElementById('sv-table');
-    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>Type</th><th>J. accueil</th><th>J. bureau</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>BAFA</th></tr></thead><tbody>'+
-      lignes.map(function(r){return'<tr><td><strong>'+U.esc(r.s.nom)+' '+U.esc(r.s.prenom)+'</strong></td><td>'+U.esc(U.SAL_TYPE_L[U.salType(r.s)])+'</td><td>'+r.nj+'</td><td>'+r.njb+'</td><td>'+r.npj+'</td><td>'+r.nd+'</td><td>'+(r.equivReunions>0?U.fmtNum(r.equivReunions,2)+' j.':'—')+'</td><td><strong>'+U.fmtNum(r.tot,2)+'</strong></td><td>'+(U.BAFA_L[r.s.bafa_statut]||'—')+'</td></tr>';}).join('')+
+    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>Type</th><th>J. accueil</th><th>J. bureau</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>Heures travaillées</th><th>BAFA</th></tr></thead><tbody>'+
+      lignes.map(function(r){return'<tr><td><strong>'+U.esc(r.s.nom)+' '+U.esc(r.s.prenom)+'</strong></td><td>'+U.esc(U.SAL_TYPE_L[U.salType(r.s)])+(U.isDirecteur(r.s)?' <span class="badge badge-primary" style="font-size:.65rem">Directeur</span>':'')+'</td>'+
+        (r.enHeures?'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>':('<td>'+r.nj+'</td><td>'+r.njb+'</td><td>'+r.npj+'</td><td>'+r.nd+'</td><td>'+(r.equivReunions>0?U.fmtNum(r.equivReunions,2)+' j.':'—')+'</td><td><strong>'+U.fmtNum(r.tot,2)+'</strong></td>'))+
+        '<td>'+(r.enHeures?'<strong>'+U.fmtNum(r.heures,2)+' h</strong>':'—')+'</td>'+
+        '<td>'+(U.BAFA_L[r.s.bafa_statut]||'—')+'</td></tr>';}).join('')+
       '</tbody></table>':'<div class="empty" style="padding:2rem"><i class="ti ti-table"></i><p>Aucune donnée</p></div>';
-    var totx=lignes.reduce(function(a,r){return{nj:a.nj+r.nj,njb:a.njb+r.njb,npj:a.npj+r.npj,nd:a.nd+r.nd,equivReunions:a.equivReunions+(r.equivReunions||0),tot:a.tot+r.tot};},{nj:0,njb:0,npj:0,nd:0,equivReunions:0,tot:0});
-    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.njb+'</strong> j. bureau · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>':'';
+    var joursRows=lignes.filter(function(r){return!r.enHeures;});
+    var heuresRows=lignes.filter(function(r){return r.enHeures;});
+    var totx=joursRows.reduce(function(a,r){return{nj:a.nj+r.nj,njb:a.njb+r.njb,npj:a.npj+r.npj,nd:a.nd+r.nd,equivReunions:a.equivReunions+(r.equivReunions||0),tot:a.tot+r.tot};},{nj:0,njb:0,npj:0,nd:0,equivReunions:0,tot:0});
+    var totHeures=heuresRows.reduce(function(a,r){return a+(r.heures||0);},0);
+    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.njb+'</strong> j. bureau · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>'+(heuresRows.length?' · <strong>'+U.fmtNum(totHeures,2)+'</strong> h travaillées (directeur/technicien)':''):'';
+  }
+
+  // Durée travaillée (en heures décimales) d'une affectation ou d'une préparation, déjeuner déduit
+  // pour les journées administratives (seules à porter heure_fin_matin/heure_debut_apm).
+  function _dureeHeures(a,j){
+    if(!a||!a.heure_debut||!a.heure_fin)return 0;
+    var toH=function(t){var p=(t||'').split(':');return(parseInt(p[0],10)||0)+(parseInt(p[1],10)||0)/60;};
+    var total=toH(a.heure_fin)-toH(a.heure_debut);
+    if(j&&j.type==='administratif'&&j.heure_fin_matin&&j.heure_debut_apm){
+      var pause=toH(j.heure_debut_apm)-toH(j.heure_fin_matin);
+      if(pause>0)total-=pause;
+    }
+    return total>0?total:0;
   }
 
   return{init,refresh};
