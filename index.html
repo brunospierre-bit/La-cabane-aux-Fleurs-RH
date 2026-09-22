@@ -160,6 +160,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 .badge-purple{background:#EDE4FB;color:#6D28D9}
 .badge-pink{background:#FCE4EC;color:#BE185D}
 .badge-slate{background:#E5E7EB;color:#374151}
+.badge-teal{background:#CCFBF1;color:#0F766E}
 
 /* ===== ALERTS ===== */
 .alert{padding:.7rem 1rem;border-radius:var(--radius);font-size:.875rem;display:flex;gap:.6rem;align-items:flex-start;border:1px solid transparent;margin-bottom:.5rem}
@@ -215,6 +216,7 @@ textarea.form-control{resize:vertical;min-height:80px}
 .cal-ev{font-size:.65rem;padding:.12rem .3rem;border-radius:3px;margin-bottom:.18rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;cursor:pointer}
 .ev-peri{background:#FFE8D0;color:#C05510}.ev-extra{background:#E8F5D0;color:#3A7010}.ev-reun{background:#BFECFF;color:#0369A1}
 .ev-admin{background:#E5E7EB;color:#374151}.ev-bureau{background:#EDE4FB;color:#6D28D9}.ev-clement{background:#FCE4EC;color:#BE185D}
+.ev-conges{background:#CCFBF1;color:#0F766E}
 .ev-tam{background:#FEF3C7;color:#92400E;font-weight:600}.ev-tam-done{background:var(--gray-100);color:var(--text-m);text-decoration:line-through;font-weight:500}
 .cal-legend{display:flex;flex-wrap:wrap;gap:.4rem .9rem;margin:.7rem 0 0;font-size:.72rem;color:var(--text-m)}
 .cal-legend-item{display:flex;align-items:center;gap:.35rem}
@@ -522,7 +524,7 @@ textarea.form-control{resize:vertical;min-height:80px}
         <select id="sv-saltype" class="form-control"><option value="">— Tous types de salarié —</option><option value="animateur">Animateur</option><option value="technicien_restauration">Technicien de restauration</option></select>
         <select id="sv-mois" class="form-control"><option value="">— Tous les mois —</option></select>
         <select id="sv-an" class="form-control"><option value="">— Toutes les années —</option></select>
-        <select id="sv-type" class="form-control"><option value="">— Tous types —</option><option value="periscolaire">Périscolaire</option><option value="extrascolaire">Extrascolaire</option><option value="preparation">Préparation / Réunion</option><option value="administratif">Administratif</option><option value="reunion_bureau">Réunion bureau</option><option value="point_clement_bureau">Point Clément - Bureau</option></select>
+        <select id="sv-type" class="form-control"><option value="">— Tous types —</option><option value="periscolaire">Périscolaire</option><option value="extrascolaire">Extrascolaire</option><option value="preparation">Préparation / Réunion</option><option value="administratif">Administratif</option><option value="reunion_bureau">Réunion bureau</option><option value="point_clement_bureau">Point Clément - Bureau</option><option value="conges_payes">Congés payés</option></select>
       </div></div>
       <div class="card mt3"><div class="card-body p0"><div class="table-wrap" id="sv-table"></div></div><div class="card-footer" id="sv-totals"></div></div>
     </section>
@@ -1140,12 +1142,12 @@ const DB = (function(){
 const U = (function(){
   var MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
   var BAFA_L={non_diplome:'Non diplômé',stagiaire:'Stagiaire BAFA',titulaire:'Titulaire BAFA',directeur:'Directeur'};
-  var TYPE_L={periscolaire:'Périscolaire',extrascolaire:'Extrascolaire',reunion_prepa:'Réunion de préparation',administratif:'Administratif',reunion_bureau:'Réunion bureau',point_clement_bureau:'Point Clément - Bureau'};
+  var TYPE_L={periscolaire:'Périscolaire',extrascolaire:'Extrascolaire',reunion_prepa:'Réunion de préparation',administratif:'Administratif',reunion_bureau:'Réunion bureau',point_clement_bureau:'Point Clément - Bureau',conges_payes:'Congés payés'};
   // Types de journée qui ne sont pas des accueils de loisirs (pas d'enfants, pas de taux d'encadrement)
   var TYPE_BUREAU=['administratif','reunion_bureau','point_clement_bureau'];
   // Couleur de badge associée à chaque type de journée (cohérent avec les badges .ev-* du calendrier)
-  var TYPE_BADGE_CLS={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info',administratif:'slate',reunion_bureau:'purple',point_clement_bureau:'pink'};
-  var TYPE_EV_CLS={periscolaire:'peri',extrascolaire:'extra',reunion_prepa:'reun',administratif:'admin',reunion_bureau:'bureau',point_clement_bureau:'clement'};
+  var TYPE_BADGE_CLS={periscolaire:'primary',extrascolaire:'success',reunion_prepa:'info',administratif:'slate',reunion_bureau:'purple',point_clement_bureau:'pink',conges_payes:'teal'};
+  var TYPE_EV_CLS={periscolaire:'peri',extrascolaire:'extra',reunion_prepa:'reun',administratif:'admin',reunion_bureau:'bureau',point_clement_bureau:'clement',conges_payes:'conges'};
   function isTypeBureau(t){return TYPE_BUREAU.indexOf(t)!==-1;}
   var SAL_TYPE_L={animateur:'Animateur',technicien_restauration:'Technicien de restauration'};
   function salType(s){return(s&&s.type_salarie)||'animateur';} // rétrocompatibilité : absence de type = animateur
@@ -1154,6 +1156,11 @@ const U = (function(){
   // animateur/technicien) — c'est la convention déjà utilisée ailleurs dans l'app (coûts, alertes
   // de contrat) pour identifier les directeurs.
   function isDirecteur(s){return!!(s&&s.bafa_statut==='directeur');}
+  // Congés payés : réservés aux salariés ayant un contrat de travail classique (directeur,
+  // technicien de restauration) — les animateurs sont en contrat d'engagement éducatif (CEE), qui
+  // intègre déjà une indemnité compensatrice de congés de 10 % dans le taux journalier (cf. Contrats,
+  // article 7), ils ne "posent" donc pas de congés au sens classique du terme.
+  function isCongesEligible(s){return isDirecteur(s)||isTechnicien(s);}
   var AV_COLORS=['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#4F46E5','#9333EA','#16A34A'];
 
   function fmtDate(s,opts){
@@ -1336,7 +1343,7 @@ const U = (function(){
     return list.filter(function(s){return!s.archived;}).sort(function(a,b){return(a.nom+a.prenom).localeCompare(b.nom+b.prenom,'fr');});
   }
 
-  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,salType,isTechnicien,isDirecteur,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
+  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,salType,isTechnicien,isDirecteur,isCongesEligible,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
 })();
 
 // ===== NAVIGATION / ROUTING =====
@@ -1700,7 +1707,7 @@ var Dashboard = (function(){
     document.getElementById('dash-next').innerHTML=next.length?next.map(function(j){
       var cls=U.TYPE_BADGE_CLS[j.type]||'neutral';
       var affJ2=affects.filter(function(a){return a.journee_id===j.id;});
-      var isSimpleJ=U.isTypeBureau(j.type)||j.type==='reunion_prepa';
+      var isSimpleJ=U.isTypeBureau(j.type)||j.type==='reunion_prepa'||j.type==='conges_payes';
       var nbAnimJ=affJ2.filter(function(a){return a.groupe!=='technicien';}).length;
       var nbTechJ=affJ2.filter(function(a){return a.groupe==='technicien';}).length;
       var metaTxt=isSimpleJ
@@ -2275,7 +2282,7 @@ var Planning = (function(){
   function _renderLegend(){
     var el=document.getElementById('cal-legend');
     if(!el)return;
-    var types=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'];
+    var types=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau','conges_payes'];
     var html=types.map(function(t){
       return'<span class="cal-legend-item"><span class="cal-legend-dot ev-'+U.TYPE_EV_CLS[t]+'"></span>'+U.TYPE_L[t]+'</span>';
     }).join('');
@@ -2358,7 +2365,7 @@ var Planning = (function(){
           html+='<div class="cal-ev ev-tam'+(e.fait?' ev-tam-done':'')+'" data-tam="'+U.esc(e.tamKey)+'" title="'+U.esc(e.titre)+' — réservé au directeur, sans horaire">🔔 '+tamLabel+'</div>';
           return;
         }
-        html+='<div class="cal-ev ev-'+(U.TYPE_EV_CLS[e.type]||'extra')+'" data-jid="'+e.id+'" data-prep="'+(e._prep?1:0)+'">'+(e.type==='reunion_prepa'?'📝 Réunion':U.isTypeBureau(e.type)?U.esc(U.TYPE_L[e.type]):(e.heure_debut||''))+'</div>';
+        html+='<div class="cal-ev ev-'+(U.TYPE_EV_CLS[e.type]||'extra')+'" data-jid="'+e.id+'" data-prep="'+(e._prep?1:0)+'">'+(e.type==='reunion_prepa'?'📝 Réunion':e.type==='conges_payes'?'🌴 '+U.esc(U.TYPE_L[e.type]):U.isTypeBureau(e.type)?U.esc(U.TYPE_L[e.type]):(e.heure_debut||''))+'</div>';
       });
       if(evs.length>2)html+='<div class="cal-ev" style="background:var(--gray-100);color:var(--text-m)">+' +(evs.length-2)+'</div>';
       html+='</div>';
@@ -2512,7 +2519,7 @@ var Planning = (function(){
 
   // Types de journée qui utilisent le mode d'affectation "simple" (liste de salariés présents,
   // sans enfants ni taux d'encadrement) : réunion de préparation + journées de bureau.
-  function isSimpleAssign(t){return t==='reunion_prepa'||U.isTypeBureau(t);}
+  function isSimpleAssign(t){return t==='reunion_prepa'||t==='conges_payes'||U.isTypeBureau(t);}
 
   async function openJournee(id,dateDefault){
     var j=id?await DB.get('journees',id):null;
@@ -2555,7 +2562,7 @@ var Planning = (function(){
     var initRows=animAffects.length?animAffects.map(function(a,i){return animRow(i,a);}).join(''):animRow(0,null);
     var techInitRows=techAffects.length?techAffects.map(function(a,i){return techRow(i,a);}).join(''):techRow(0,null);
 
-    var typeOptions=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){
+    var typeOptions=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau','conges_payes'].map(function(t){
       var sel=(j?j.type===t:t==='extrascolaire')?' selected':'';
       return'<option value="'+t+'"'+sel+'>'+U.TYPE_L[t]+'</option>';
     }).join('');
@@ -2605,6 +2612,7 @@ var Planning = (function(){
       var animBtn=document.getElementById('janim-tab-btn');
       var reunW=document.getElementById('jf-reunion-sals');
       var isAdmin=t==='administratif';
+      var isConges=t==='conges_payes';
       var hfmW=document.getElementById('jf-hfm-wrap'),hdamW=document.getElementById('jf-hdam-wrap');
       if(npW)npW.style.display=isSimple?'none':'';
       if(ngW)ngW.style.display=isSimple?'none':'';
@@ -2612,17 +2620,19 @@ var Planning = (function(){
       if(reunW)reunW.style.display=isSimple?'':'none';
       if(hfmW)hfmW.style.display=isAdmin?'':'none';
       if(hdamW)hdamW.style.display=isAdmin?'':'none';
-      // Journées administratives : seul le directeur est concerné — la liste des salariés
-      // affectables est restreinte en conséquence (les autres types de journées "simples"
-      // — réunion de préparation, réunion de bureau, point Clément — restent ouverts à tous).
+      // Journées administratives : seul le directeur est concerné. Congés payés : réservés au
+      // directeur et au technicien de restauration (seuls salariés en contrat classique — les
+      // animateurs, en CEE, ont déjà une indemnité compensatrice de congés intégrée à leur taux
+      // journalier). Les autres types de journées "simples" — réunion de préparation, réunion de
+      // bureau, point Clément — restent ouverts à tous.
       var rsel=document.getElementById('jf-reunion-sel');
       var rhint=document.getElementById('jf-reunion-hint');
       if(rsel){
-        var pool=isAdmin?sals.filter(U.isDirecteur):sals;
+        var pool=isAdmin?sals.filter(U.isDirecteur):(isConges?sals.filter(U.isCongesEligible):sals);
         var prevSel=new Set(Array.from(rsel.selectedOptions).map(function(o){return o.value;}));
         rsel.innerHTML=pool.map(function(s){return'<option value="'+s.id+'"'+(prevSel.has(String(s.id))?' selected':'')+'>'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('');
       }
-      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés';
+      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':(isConges?'Seuls le directeur et le technicien de restauration peuvent poser des congés payés.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés');
       var encLive=document.getElementById('enc-live');
       if(isSimple&&encLive)encLive.innerHTML='';
       if(isSimple){
@@ -2936,7 +2946,7 @@ var Planning = (function(){
           '<div class="form-group"><label class="form-label">Date début <span class="req">*</span></label><input type="date" id="jbc-from" class="form-control" value="'+U.today()+'"/></div>'+
           '<div class="form-group"><label class="form-label">Date fin <span class="req">*</span></label><input type="date" id="jbc-to" class="form-control" value="'+U.today()+'"/></div>'+
           '<div class="form-group"><label class="form-label">Type de journée <span class="req">*</span></label><select id="jbc-type" class="form-control">'+
-            ['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){return'<option value="'+t+'"'+(t==='periscolaire'?' selected':'')+'>'+U.TYPE_L[t]+'</option>';}).join('')+
+            ['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau','conges_payes'].map(function(t){return'<option value="'+t+'"'+(t==='periscolaire'?' selected':'')+'>'+U.TYPE_L[t]+'</option>';}).join('')+
           '</select></div>'+
           '<div class="form-group"><label class="form-label">Heure début</label><input type="time" id="jbc-hd" class="form-control" value="07:30"/></div>'+
           '<div class="form-group"><label class="form-label">Heure fin</label><input type="time" id="jbc-hf" class="form-control" value="18:30"/></div>'+
@@ -2980,6 +2990,7 @@ var Planning = (function(){
       var t=document.getElementById('jbc-type').value;
       var isSimple=isSimpleAssign(t);
       var isAdmin=t==='administratif';
+      var isConges=t==='conges_payes';
       var simpleW=document.getElementById('jbc-pers-simple');
       var accW=document.getElementById('jbc-pers-accueil');
       var hfmW=document.getElementById('jbc-hfm-wrap'),hdamW=document.getElementById('jbc-hdam-wrap');
@@ -2990,15 +3001,16 @@ var Planning = (function(){
       if(hdamW)hdamW.style.display=isAdmin?'':'none';
       if(npW)npW.style.display=isSimple?'none':'';
       if(ngW)ngW.style.display=isSimple?'none':'';
-      // Journées administratives : seul le directeur est concerné.
+      // Journées administratives : seul le directeur est concerné. Congés payés : réservés au
+      // directeur et au technicien de restauration.
       var rsel=document.getElementById('jbc-reunion-sel');
       var rhint=document.getElementById('jbc-reunion-hint');
       if(rsel){
-        var pool=isAdmin?sals.filter(U.isDirecteur):sals;
+        var pool=isAdmin?sals.filter(U.isDirecteur):(isConges?sals.filter(U.isCongesEligible):sals);
         var prevSel=new Set(Array.from(rsel.selectedOptions).map(function(o){return o.value;}));
         rsel.innerHTML=pool.map(function(s){return'<option value="'+s.id+'"'+(prevSel.has(String(s.id))?' selected':'')+'>'+U.esc(s.nom)+' '+U.esc(s.prenom)+' — '+U.SAL_TYPE_L[U.salType(s)]+'</option>';}).join('');
       }
-      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée';
+      if(rhint)rhint.textContent=isAdmin?'Seul le directeur peut être affecté à une journée administrative.':(isConges?'Seuls le directeur et le technicien de restauration peuvent poser des congés payés.':'Ctrl+clic (ou Cmd) pour sélectionner plusieurs salariés — affectés identiquement à chaque journée créée');
     }
 
     document.getElementById('jbc-anim-rows').insertAdjacentHTML('beforeend',jbcAnimRow());
@@ -3097,7 +3109,7 @@ var Planning = (function(){
   // ===== SUPPRESSION EN MASSE DE JOURNÉES =====
   // Liste filtrable (par type + plage de dates) avec sélection individuelle des journées à
   // supprimer. Supprime aussi les affectations liées à chaque journée supprimée.
-  var BULK_DEL_TYPES=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'];
+  var BULK_DEL_TYPES=['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau','conges_payes'];
 
   async function openBulkDelete(){
     U.modal({
@@ -3682,7 +3694,7 @@ var Contrats = (function(){
           '<div style="display:flex;gap:.4rem;margin-bottom:.4rem">'+
             '<select id="cf-fan" class="form-control form-control-sm" style="flex:1"><option value="">Toutes années</option>'+[...new Set(allJ.map(function(j){return j.annee;}))].filter(Boolean).sort().reverse().map(function(a){return'<option value="'+a+'">'+a+'</option>';}).join('')+'</select>'+
             '<select id="cf-fm" class="form-control form-control-sm" style="flex:1"><option value="">Tous mois</option>'+U.MOIS.map(function(m,i){return'<option value="'+(i+1)+'">'+m+'</option>';}).join('')+'</select>'+
-            '<select id="cf-ft" class="form-control form-control-sm" style="flex:1"><option value="">Tous types</option>'+['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau'].map(function(t){return'<option value="'+t+'">'+U.TYPE_L[t]+'</option>';}).join('')+'</select>'+
+            '<select id="cf-ft" class="form-control form-control-sm" style="flex:1"><option value="">Tous types</option>'+['periscolaire','extrascolaire','reunion_prepa','administratif','reunion_bureau','point_clement_bureau','conges_payes'].map(function(t){return'<option value="'+t+'">'+U.TYPE_L[t]+'</option>';}).join('')+'</select>'+
             '<button class="btn btn-ghost btn-sm" id="cf-selall" title="Tout sélectionner visible"><i class="ti ti-check-all"></i></button>'+
           '</div>'+
           '<div id="cf-jlist" style="border:1px solid var(--border);border-radius:8px;max-height:280px;overflow-y:auto">'+allJ.map(jRow).join('')+'</div>'+
@@ -4132,19 +4144,24 @@ var Suivi = (function(){
       var af=affects.filter(function(a){return a.salarie_id===s.id;});
       var allJ=af.map(function(a){return jours.find(function(j){return j.id===a.journee_id;});}).filter(Boolean);
       // Séparer journées d'accueil réel / journées de bureau / réunions de préparation
-      var jj=allJ.filter(function(j){return j.type!=='reunion_prepa'&&!U.isTypeBureau(j.type);});
+      // Congés payés : suivis à part, dans leur propre colonne (n'entrent ni dans "J. accueil"
+      // ni dans "Total équiv." ni dans "Heures travaillées" — ce ne sont pas des jours travaillés).
+      var jj=allJ.filter(function(j){return j.type!=='reunion_prepa'&&j.type!=='conges_payes'&&!U.isTypeBureau(j.type);});
       var jb=allJ.filter(function(j){return U.isTypeBureau(j.type);});
       var reunions=allJ.filter(function(j){return j.type==='reunion_prepa';});
+      var jcp=allJ.filter(function(j){return j.type==='conges_payes';});
       var pp=preps.filter(function(p){return p.salaries_ids&&p.salaries_ids.includes(s.id);});
-      if(an){jj=jj.filter(function(j){return j.annee===an;});jb=jb.filter(function(j){return j.annee===an;});reunions=reunions.filter(function(j){return j.annee===an;});pp=pp.filter(function(p){return p.annee===an;});}
-      if(mois){jj=jj.filter(function(j){return j.mois===mois;});jb=jb.filter(function(j){return j.mois===mois;});reunions=reunions.filter(function(j){return j.mois===mois;});pp=pp.filter(function(p){return p.mois===mois;});}
-      if(type==='periscolaire'){jb=[];reunions=[];pp=[];jj=jj.filter(function(j){return j.type==='periscolaire';});}
-      else if(type==='extrascolaire'){jb=[];reunions=[];pp=[];jj=jj.filter(function(j){return j.type==='extrascolaire';});}
-      else if(type==='preparation'){jj=[];jb=[];}
-      else if(U.isTypeBureau(type)){jj=[];reunions=[];pp=[];jb=jb.filter(function(j){return j.type===type;});}
-      else if(type){jj=[];jb=[];reunions=[];pp=[];}
+      if(an){jj=jj.filter(function(j){return j.annee===an;});jb=jb.filter(function(j){return j.annee===an;});reunions=reunions.filter(function(j){return j.annee===an;});jcp=jcp.filter(function(j){return j.annee===an;});pp=pp.filter(function(p){return p.annee===an;});}
+      if(mois){jj=jj.filter(function(j){return j.mois===mois;});jb=jb.filter(function(j){return j.mois===mois;});reunions=reunions.filter(function(j){return j.mois===mois;});jcp=jcp.filter(function(j){return j.mois===mois;});pp=pp.filter(function(p){return p.mois===mois;});}
+      if(type==='periscolaire'){jb=[];reunions=[];pp=[];jcp=[];jj=jj.filter(function(j){return j.type==='periscolaire';});}
+      else if(type==='extrascolaire'){jb=[];reunions=[];pp=[];jcp=[];jj=jj.filter(function(j){return j.type==='extrascolaire';});}
+      else if(type==='preparation'){jj=[];jb=[];jcp=[];}
+      else if(type==='conges_payes'){jj=[];jb=[];reunions=[];pp=[];}
+      else if(U.isTypeBureau(type)){jj=[];reunions=[];pp=[];jcp=[];jb=jb.filter(function(j){return j.type===type;});}
+      else if(type){jj=[];jb=[];reunions=[];pp=[];jcp=[];}
       var nj=jj.length;
       var njb=jb.length;
+      var ncp=jcp.length;
       // Réunions de préparation : équivalent calculé selon la durée (4h=0.5j, 8h=1j)
       var equivReunions=reunions.reduce(function(acc,r){return acc+calcEquivReunion(r.heure_debut,r.heure_fin);},0);
       var npj=pp.filter(function(p){return p.sous_type!=='demi_journee';}).length;
@@ -4162,21 +4179,23 @@ var Suivi = (function(){
         });
         pp.forEach(function(p){heures+=_dureeHeures(p,null);});
       }
-      if(tot===0&&heures===0&&!salId)continue;
-      lignes.push({s,nj,njb,npj,nd,equivReunions,tot,enHeures,heures});
+      if(tot===0&&heures===0&&ncp===0&&!salId)continue;
+      lignes.push({s,nj,njb,npj,nd,equivReunions,tot,enHeures,heures,ncp});
     }
     var tw=document.getElementById('sv-table');
-    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>Type</th><th>J. accueil</th><th>J. bureau</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>Heures travaillées</th><th>BAFA</th></tr></thead><tbody>'+
+    tw.innerHTML=lignes.length?'<table class="data-table"><thead><tr><th>Salarié</th><th>Type</th><th>J. accueil</th><th>J. bureau</th><th>J. prépa</th><th>Demi-j.</th><th>Réunion prépa</th><th>Total équiv.</th><th>Heures travaillées</th><th>Congés payés</th><th>BAFA</th></tr></thead><tbody>'+
       lignes.map(function(r){return'<tr><td><strong>'+U.esc(r.s.nom)+' '+U.esc(r.s.prenom)+'</strong></td><td>'+U.esc(U.SAL_TYPE_L[U.salType(r.s)])+(U.isDirecteur(r.s)?' <span class="badge badge-primary" style="font-size:.65rem">Directeur</span>':'')+'</td>'+
         (r.enHeures?'<td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>':('<td>'+r.nj+'</td><td>'+r.njb+'</td><td>'+r.npj+'</td><td>'+r.nd+'</td><td>'+(r.equivReunions>0?U.fmtNum(r.equivReunions,2)+' j.':'—')+'</td><td><strong>'+U.fmtNum(r.tot,2)+'</strong></td>'))+
         '<td>'+(r.enHeures?'<strong>'+U.fmtNum(r.heures,2)+' h</strong>':'—')+'</td>'+
+        '<td>'+(r.ncp>0?'<strong>'+r.ncp+' j.</strong>':'—')+'</td>'+
         '<td>'+(U.BAFA_L[r.s.bafa_statut]||'—')+'</td></tr>';}).join('')+
       '</tbody></table>':'<div class="empty" style="padding:2rem"><i class="ti ti-table"></i><p>Aucune donnée</p></div>';
     var joursRows=lignes.filter(function(r){return!r.enHeures;});
     var heuresRows=lignes.filter(function(r){return r.enHeures;});
     var totx=joursRows.reduce(function(a,r){return{nj:a.nj+r.nj,njb:a.njb+r.njb,npj:a.npj+r.npj,nd:a.nd+r.nd,equivReunions:a.equivReunions+(r.equivReunions||0),tot:a.tot+r.tot};},{nj:0,njb:0,npj:0,nd:0,equivReunions:0,tot:0});
     var totHeures=heuresRows.reduce(function(a,r){return a+(r.heures||0);},0);
-    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.njb+'</strong> j. bureau · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>'+(heuresRows.length?' · <strong>'+U.fmtNum(totHeures,2)+'</strong> h travaillées (directeur/technicien)':''):'';
+    var totCP=lignes.reduce(function(a,r){return a+(r.ncp||0);},0);
+    document.getElementById('sv-totals').innerHTML=lignes.length?'<span class="text-m text-sm">'+lignes.length+' salarié(s) · </span><strong>'+totx.nj+'</strong> j. acc. · <strong>'+totx.njb+'</strong> j. bureau · <strong>'+totx.npj+'</strong> j. prépa · <strong>'+totx.nd+'</strong> demi-j.'+(totx.equivReunions>0?' · <strong>'+U.fmtNum(totx.equivReunions,2)+'</strong> j. réunion':'')+' → <strong>'+U.fmtNum(totx.tot,2)+' j. équiv.</strong>'+(heuresRows.length?' · <strong>'+U.fmtNum(totHeures,2)+'</strong> h travaillées (directeur/technicien)':'')+(totCP>0?' · <strong>'+totCP+'</strong> j. congés payés':''):'';
   }
 
   // Durée travaillée (en heures décimales) d'une affectation ou d'une préparation, déjeuner déduit
@@ -4235,13 +4254,15 @@ var Export = (function(){
       function inRange(date){if(!date)return true;var m=date.split('-').slice(0,2).join('-');return(!from||m>=from)&&(!to||m<=to);}
       var af=affects.filter(function(a){return a.salarie_id===s.id;});
       var allJours=af.map(function(a){return jours.find(function(j){return j.id===a.journee_id;});}).filter(Boolean).filter(function(j){return inRange(j.date);});
-      // Séparer accueil classique, journées de bureau et réunions de préparation
-      var jj=allJours.filter(function(j){return j.type!=='reunion_prepa'&&!U.isTypeBureau(j.type);});
+      // Séparer accueil classique, journées de bureau, réunions de préparation et congés payés
+      var jj=allJours.filter(function(j){return j.type!=='reunion_prepa'&&j.type!=='conges_payes'&&!U.isTypeBureau(j.type);});
       var jbur=allJours.filter(function(j){return U.isTypeBureau(j.type);});
       var reunions=allJours.filter(function(j){return j.type==='reunion_prepa';});
+      var jcp=allJours.filter(function(j){return j.type==='conges_payes';});
       var pp=preps.filter(function(p){return p.salaries_ids&&p.salaries_ids.includes(s.id)&&inRange(p.date);});
       var nj=jj.length;
       var njb=jbur.length;
+      var ncp=jcp.length;
       var np=pp.filter(function(p){return p.sous_type!=='demi_journee';}).length;
       var nd=pp.filter(function(p){return p.sous_type==='demi_journee';}).length;
       // Réunions : équivalent calculé sur la durée (4h=0.5j, 8h=1j)
@@ -4260,7 +4281,8 @@ var Export = (function(){
         'Email':s.email||'',
         // Colonnes ajoutées en fin de tableau pour ne pas modifier l'ordre existant :
         'Type de salarié':U.SAL_TYPE_L[U.salType(s)],
-        'J. bureau (admin./réunion/Point Clément)':njb
+        'J. bureau (admin./réunion/Point Clément)':njb,
+        'Congés payés':ncp
       };
     });
   }
