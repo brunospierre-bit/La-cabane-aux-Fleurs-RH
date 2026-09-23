@@ -2255,6 +2255,10 @@ var VACANCES_SCOLAIRES=[
 
 var Planning = (function(){
   var _y=new Date().getFullYear(),_m=new Date().getMonth(),_view='month';
+  // Cache du dernier jeu d'événements affiché (mois courant), pour pouvoir retrouver TOUS les
+  // événements d'un jour donné — y compris ceux au-delà des 2 affichés dans une case du calendrier
+  // — quand on clique sur l'indicateur "+N" (cf. _openDayEvents).
+  var _curEvts=[];
   var PARAMS={tp:8,tg:12};
 
   async function init(){
@@ -2337,6 +2341,7 @@ var Planning = (function(){
       return parseInt(parts[0])===_y&&parseInt(parts[1])===_m+1;
     });
     filtered.sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+    _curEvts=filtered;
     var cv=document.getElementById('cal-view');
     cv.innerHTML=_view==='month'?_renderMonth(filtered):_renderList(filtered);
     _bindCalEvents(cv);
@@ -2367,7 +2372,7 @@ var Planning = (function(){
         }
         html+='<div class="cal-ev ev-'+(U.TYPE_EV_CLS[e.type]||'extra')+'" data-jid="'+e.id+'" data-prep="'+(e._prep?1:0)+'">'+(e.type==='reunion_prepa'?'📝 Réunion':e.type==='conges_payes'?'🌴 '+U.esc(U.TYPE_L[e.type]):U.isTypeBureau(e.type)?U.esc(U.TYPE_L[e.type]):(e.heure_debut||''))+'</div>';
       });
-      if(evs.length>2)html+='<div class="cal-ev" style="background:var(--gray-100);color:var(--text-m)">+' +(evs.length-2)+'</div>';
+      if(evs.length>2)html+='<div class="cal-ev cal-more" data-date="'+ds+'" style="background:var(--gray-100);color:var(--text-m);cursor:pointer;font-weight:600">+' +(evs.length-2)+' de plus</div>';
       html+='</div>';
     }
     var total=dow+nbDays; var rem=total%7===0?0:7-total%7;
@@ -2393,11 +2398,35 @@ var Planning = (function(){
     }).join('');
   }
 
+  // Vue mois : au-delà de 2 événements affichés dans une case, un indicateur "+N de plus" ouvre
+  // cette liste complète du jour (tous les événements, y compris ceux masqués dans la case),
+  // chacun restant cliquable pour l'ouvrir — corrige l'impossibilité d'accéder aux événements
+  // au-delà des 2 premiers d'une même journée.
+  function _openDayEvents(dateStr){
+    var evts=_curEvts.filter(function(e){return e.date===dateStr;});
+    U.modal({
+      title:U.capitalize(U.fmtDate(dateStr)),
+      body:evts.length?_renderList(evts):'<div class="empty" style="padding:1.5rem"><i class="ti ti-calendar"></i><p>Aucun événement ce jour</p></div>',
+      footer:'<button class="btn btn-ghost" id="cal-day-close">Fermer</button><button class="btn btn-primary" id="cal-day-add"><i class="ti ti-plus"></i> Ajouter une journée</button>'
+    });
+    document.getElementById('cal-day-close').onclick=U.closeModal;
+    document.getElementById('cal-day-add').onclick=function(){openJournee(null,dateStr);};
+    _bindCalEvents(document.getElementById('modal-body'));
+  }
+
   function _bindCalEvents(cv){
     cv.querySelectorAll('.cal-day:not(.other)').forEach(function(day){
       day.onclick=function(e){
         if(e.target.closest('.cal-ev'))return;
         openJournee(null,day.dataset.date);
+      };
+    });
+    // Indicateur "+N de plus" (mois avec >2 événements sur un même jour) : ouvre la liste complète
+    // du jour, chaque événement restant cliquable pour l'ouvrir individuellement.
+    cv.querySelectorAll('.cal-more').forEach(function(more){
+      more.onclick=function(e){
+        e.stopPropagation();
+        _openDayEvents(more.dataset.date);
       };
     });
     cv.querySelectorAll('.cal-ev[data-jid]').forEach(function(ev){
