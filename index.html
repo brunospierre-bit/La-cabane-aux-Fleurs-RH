@@ -1165,6 +1165,11 @@ const U = (function(){
   var SALLES_L={ecole_fleurs:'École des Fleurs',gymnase_canopee:'Gymnase La Canopée',salle_multi:'Salle Multi-activités',city_stade:'City-Stade'};
   var SALLES_ORDER=['ecole_fleurs','gymnase_canopee','salle_multi','city_stade'];
   var SALLES_RESERVABLES=['gymnase_canopee','salle_multi','city_stade'];
+  // Source unique des valeurs par défaut des paramètres (utilisée à la fois par Param.init(), qui
+  // pré-remplit les champs de la page Paramétrage, et par tout autre lecteur de DB.getParam — comme
+  // le courrier d'extraction des salles — pour qu'ils restent identiques même si l'utilisateur n'a
+  // jamais ouvert/enregistré la page Paramétrage depuis l'ajout d'un nouveau champ.
+  var PARAM_DEFAULTS={p_cj:'80',p_cc:'25',p_ip:'10',p_tp:'8',p_tg:'12',p_zone:'C',p_nom:'',p_adr:'',p_email:'lacabaneauxfleursasso@gmail.com',p_siret:'',p_resp:'',p_bk:'7',p_mairie_nom:'Mairie de Janneyrias',p_mairie_adr:'30 route de Crémieu\n38280 Janneyrias',p_mairie_delai:'1 semaine'};
   function salType(s){return(s&&s.type_salarie)||'animateur';} // rétrocompatibilité : absence de type = animateur
   function isTechnicien(s){return salType(s)==='technicien_restauration';}
   // Le statut "directeur" est porté par le champ bafa_statut (indépendant du type_salarie
@@ -1358,7 +1363,7 @@ const U = (function(){
     return list.filter(function(s){return!s.archived;}).sort(function(a,b){return(a.nom+a.prenom).localeCompare(b.nom+b.prenom,'fr');});
   }
 
-  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,SALLES_L,SALLES_ORDER,SALLES_RESERVABLES,salType,isTechnicien,isDirecteur,isCongesEligible,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
+  return{MOIS,BAFA_L,TYPE_L,TYPE_BUREAU,TYPE_BADGE_CLS,TYPE_EV_CLS,isTypeBureau,SAL_TYPE_L,SALLES_L,SALLES_ORDER,SALLES_RESERVABLES,PARAM_DEFAULTS,salType,isTechnicien,isDirecteur,isCongesEligible,fmtDate,fmtShort,today,isoLocal,curYear,curMonth,isPast,expSoon,diffDays,fmtEur,fmtNum,initials,capitalize,esc,avColor,debounce,sha256,docStatus,animContractBlockers,toast,modal,closeModal,confirm,initTabs,fileToB64,isValidDoc,download,backup,buildSalSelect,getActifs};
 })();
 
 // ===== NAVIGATION / ROUTING =====
@@ -3342,20 +3347,26 @@ var Planning = (function(){
   // Courrier au format de l'annexe fournie (lettre à la mairie : expéditeur / destinataire / objet
   // / tableau Jour-Salle-Horaires / délai de confirmation), avec les coordonnées de Paramétrage.
   async function _buildSallesLetterHTML(rows,from,to){
-    var nom=(await DB.getParam('p_nom',''))||'Association La Cabane aux Fleurs';
-    var adr=await DB.getParam('p_adr','');
-    var email=await DB.getParam('p_email','');
-    var mNom=(await DB.getParam('p_mairie_nom',''))||'Mairie de Janneyrias';
-    var mAdr=await DB.getParam('p_mairie_adr','');
-    var delai=(await DB.getParam('p_mairie_delai',''))||'1 semaine';
+    // Toutes les valeurs par défaut viennent de U.PARAM_DEFAULTS (même source que Param.init()) pour
+    // qu'un champ jamais ouvert/enregistré dans Paramétrage affiche quand même sa valeur par défaut
+    // ici plutôt qu'un blanc — c'est ce qui causait l'adresse de la mairie manquante.
+    var nom=await DB.getParam('p_nom',U.PARAM_DEFAULTS.p_nom);
+    var adr=await DB.getParam('p_adr',U.PARAM_DEFAULTS.p_adr);
+    var email=await DB.getParam('p_email',U.PARAM_DEFAULTS.p_email);
+    var mNom=await DB.getParam('p_mairie_nom',U.PARAM_DEFAULTS.p_mairie_nom);
+    var mAdr=await DB.getParam('p_mairie_adr',U.PARAM_DEFAULTS.p_mairie_adr);
+    var delai=await DB.getParam('p_mairie_delai',U.PARAM_DEFAULTS.p_mairie_delai);
+    if(!nom)nom='Association La Cabane aux Fleurs';
+    if(!mNom)mNom='Mairie de Janneyrias';
+    if(!delai)delai='1 semaine';
     var adrLines=(adr||'').split('\n').map(function(l){return l.trim();}).filter(Boolean).map(U.esc).join('<br/>');
     var mAdrLines=(mAdr||'').split('\n').map(function(l){return l.trim();}).filter(Boolean).map(U.esc).join('<br/>');
     var rowsHtml=rows.map(function(r,i){
       var jourTxt=U.capitalize(U.fmtDate(r.date,{weekday:'long',day:'2-digit',month:'long',year:'numeric'}));
       return'<tr style="background:'+(i%2===0?'#ffffff':'#FFF4EC')+'">'+
-        '<td style="padding:.5rem .7rem;border:1px solid #ddd">'+U.esc(jourTxt)+'</td>'+
-        '<td style="padding:.5rem .7rem;border:1px solid #ddd">'+U.esc(U.SALLES_L[r.salle]||r.salle)+'</td>'+
-        '<td style="padding:.5rem .7rem;border:1px solid #ddd">'+(r.hd&&r.hf?U.esc(r.hd+' – '+r.hf):'—')+'</td>'+
+        '<td style="padding:.5rem .7rem;border:1px solid #ddd;color:#1a1a1a">'+U.esc(jourTxt)+'</td>'+
+        '<td style="padding:.5rem .7rem;border:1px solid #ddd;color:#1a1a1a">'+U.esc(U.SALLES_L[r.salle]||r.salle)+'</td>'+
+        '<td style="padding:.5rem .7rem;border:1px solid #ddd;color:#1a1a1a">'+(r.hd&&r.hf?U.esc(r.hd+' – '+r.hf):'—')+'</td>'+
       '</tr>';
     }).join('');
     return'<div style="font-family:Arial,sans-serif;max-width:720px;margin:0 auto;padding:1.5rem 2rem;font-size:10.5pt;color:#1a1a1a;line-height:1.5">'+
@@ -3366,10 +3377,13 @@ var Planning = (function(){
       '<p style="text-align:right;margin:0 0 1.5rem">Janneyrias, le '+U.fmtShort(U.today())+'</p>'+
       '<p style="margin:0 0 1.5rem"><u><strong>Objet</strong></u> : Demande de réservation de salle pour la période du <strong>'+U.fmtShort(from)+'</strong> au <strong>'+U.fmtShort(to)+'</strong></p>'+
       '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem">'+
-        '<thead><tr style="background:#E06818;color:#fff"><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left">Jour</th><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left">Salle</th><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left">Horaires</th></tr></thead>'+
+        // Texte d'en-tête en noir gras (plutôt que blanc sur fond orange) : la plupart des navigateurs
+        // n'impriment pas les couleurs de fond par défaut (sauf option "graphiques d'arrière-plan"
+        // cochée), ce qui rendait l'en-tête illisible (blanc sur blanc) une fois exporté en PDF.
+        '<thead><tr style="background:#FFE8D6"><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left;color:#1a1a1a;font-weight:700">Jour</th><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left;color:#1a1a1a;font-weight:700">Salle</th><th style="padding:.5rem .7rem;border:1px solid #E06818;text-align:left;color:#1a1a1a;font-weight:700">Horaires</th></tr></thead>'+
         '<tbody>'+rowsHtml+'</tbody>'+
       '</table>'+
-      '<p style="margin:0">Conformément à notre convention, cette demande doit nous être confirmée dans un délai de <strong>'+U.esc(delai)+'</strong> suivant la date de réception de cette demande par mail à l\'adresse de l\'association'+(email?' : '+U.esc(email):'')+'.</p>'+
+      '<p style="margin:0">Conformément à notre convention, cette demande doit nous être confirmée dans un délai de <strong>'+U.esc(delai)+'</strong> suivant la date de réception de cette demande par mail à l\'adresse de l\'association'+(email?' :<br/>'+U.esc(email):'')+'.</p>'+
     '</div>';
   }
 
@@ -4700,8 +4714,11 @@ var Rgpd = (function(){
 // ===== PARAMÉTRAGE =====
 var Param = (function(){
   async function init(){
-    var defs=[['p_cj','p-cj','80'],['p_cc','p-cc','25'],['p_ip','p-ip','10'],['p_tp','p-tp','8'],['p_tg','p-tg','12'],['p_zone','p-zone','C'],['p_nom','p-nom',''],['p_adr','p-adr',''],['p_email','p-email','lacabaneauxfleursasso@gmail.com'],['p_siret','p-siret',''],['p_resp','p-resp',''],['p_bk','p-bk','7'],['p_mairie_nom','p-mairie-nom','Mairie de Janneyrias'],['p_mairie_adr','p-mairie-adr','30 route de Crémieu\n38280 Janneyrias'],['p_mairie_delai','p-mairie-delai','1 semaine']];
-    for(var d of defs){var el=document.getElementById(d[1]);if(el)el.value=await DB.getParam(d[0],d[2]);}
+    // Les valeurs par défaut viennent toutes de U.PARAM_DEFAULTS (source unique), pour qu'elles restent
+    // identiques à celles utilisées ailleurs (ex. le courrier d'extraction des salles) même si cette
+    // page n'a jamais été ouverte/enregistrée.
+    var defs=[['p_cj','p-cj'],['p_cc','p-cc'],['p_ip','p-ip'],['p_tp','p-tp'],['p_tg','p-tg'],['p_zone','p-zone'],['p_nom','p-nom'],['p_adr','p-adr'],['p_email','p-email'],['p_siret','p-siret'],['p_resp','p-resp'],['p_bk','p-bk'],['p_mairie_nom','p-mairie-nom'],['p_mairie_adr','p-mairie-adr'],['p_mairie_delai','p-mairie-delai']];
+    for(var d of defs){var el=document.getElementById(d[1]);if(el)el.value=await DB.getParam(d[0],U.PARAM_DEFAULTS[d[0]]);}
     // Charger la signature existante
     var sigUrl=await DB.getParam('p_sig_url','');
     if(sigUrl){
